@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     }
 
     // 1. ELLENŐRZÉS: Lejárt-e az 5 perc?
-    if (Date.now() > user.totp.expiresAt) {
+    if (Date.now() > (user.totp.expiresAt ?? 0)) {
       return NextResponse.json({ error: "A biztonsági kód időtartama (5 perc) lejárt! Kérj új kódot." }, { status: 400 });
     }
 
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     }
 
     // Sikeres azonosítás: Töröljük a használt TOTP kódot a biztonság kedvéért
-    user.totp = undefined;
+    user.totp = { code: null, expiresAt: null };
     await user.save();
 
     // Visszaküldjük a sikeres választ a frontendnek a dashboard belépéshez

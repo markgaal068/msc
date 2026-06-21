@@ -4,14 +4,20 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2, Upload } from "lucide-react"
+import { Loader2, Upload, User } from "lucide-react"
 import ReactMarkdown from 'react-markdown'
+import ProfileView from "@/components/ProfileView"
+
+type Section = "main" | "profile" | "files"
 
 interface DashboardViewProps {
   onLogout: () => void
+  user: { email: string; name: string }
 }
 
-export default function DashboardView({ onLogout }: DashboardViewProps) {
+export default function DashboardView({ onLogout, user }: DashboardViewProps) {
+  const [showMenu, setShowMenu] = useState(false)
+  const [currentSection, setCurrentSection] = useState<Section>("main")
   const [inputs, setInputs] = useState({ faq: "", wellbeing: "", notes: "" })
   const [results, setResults] = useState({ faq: "", wellbeing: "", notes: "" })
   const [loading, setLoading] = useState<string | null>(null)
@@ -77,23 +83,61 @@ export default function DashboardView({ onLogout }: DashboardViewProps) {
       <div className="flex-1 max-w-5xl mx-auto w-full px-6 py-8 flex flex-col min-h-0">
         
         <header className="flex justify-between items-center mb-10 shrink-0">
-          <h1 className="text-2xl font-black tracking-tighter text-[#004685] uppercase">
-            Digital <span className="text-[#97c93e]">Assistant</span>
+          <h1
+            className="text-2xl font-black tracking-tighter text-[#004685] uppercase cursor-pointer"
+            onClick={() => setCurrentSection("main")}
+          >
+            SZE <span className="text-[#97c93e]">ssistant</span>
           </h1>
           <div className="flex items-center space-x-6">
             <span className="text-[10px] font-bold tracking-[0.3em] text-slate-800 uppercase">
               SZE-IVK Informatika tanszék
             </span>
-            <button 
-              onClick={onLogout}
-              className="text-[9px] font-black uppercase tracking-wider text-red-500 hover:text-red-700 transition-colors border border-red-200 px-3 py-1 bg-red-50/20"
+            <div
+              className="relative"
+              onMouseEnter={() => setShowMenu(true)}
+              onMouseLeave={() => setShowMenu(false)}
             >
-              Kijelentkezés
-            </button>
+              <button className="w-9 h-9 rounded-full bg-[#97c93e] flex items-center justify-center hover:opacity-90 transition-opacity">
+                <User className="w-5 h-5 text-white" />
+              </button>
+              {showMenu && (
+                <div className="absolute right-0 top-full w-44 bg-[#97c93e] shadow-lg z-50">
+                  <button
+                    onClick={() => { setCurrentSection("profile"); setShowMenu(false) }}
+                    className="w-full text-left px-4 py-3 text-white text-[11px] font-bold uppercase tracking-wider hover:bg-[#87b935] transition-colors"
+                  >
+                    Profil
+                  </button>
+                  <button
+                    onClick={() => { setCurrentSection("files"); setShowMenu(false) }}
+                    className="w-full text-left px-4 py-3 text-white text-[11px] font-bold uppercase tracking-wider hover:bg-[#87b935] transition-colors"
+                  >
+                    Fileok
+                  </button>
+                  <div className="border-t border-white/30">
+                    <button
+                      onClick={onLogout}
+                      className="w-full text-left px-4 py-3 text-white text-[11px] font-bold uppercase tracking-wider hover:bg-[#87b935] transition-colors"
+                    >
+                      Kijelentkezés
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
-        <Tabs defaultValue="faq" className="flex-1 flex flex-col min-h-0">
+        {currentSection === "profile" && <ProfileView user={user} />}
+
+        {currentSection === "files" && (
+          <div className="flex-1 flex items-center justify-center">
+            <p className="text-[10px] font-bold uppercase tracking-[0.5em] text-slate-300">Hamarosan</p>
+          </div>
+        )}
+
+        <Tabs defaultValue="faq" className={`flex-1 flex flex-col min-h-0 ${currentSection !== "main" ? "hidden" : ""}`}>
           <TabsList className="bg-transparent h-auto p-0 mb-8 border-b border-slate-100 w-full justify-start space-x-10 shrink-0">
             {["faq", "wellbeing", "notes"].map((id) => (
               <TabsTrigger 
@@ -185,7 +229,7 @@ export default function DashboardView({ onLogout }: DashboardViewProps) {
           </div>
         </Tabs>
 
-        <footer className="mt-8 pt-6 border-t border-slate-50 flex justify-between items-center shrink-0">
+        <footer className={`mt-8 pt-6 border-t border-slate-50 flex justify-between items-center shrink-0 ${currentSection !== "main" ? "hidden" : ""}`}>
           <p className="text-[8px] font-bold uppercase tracking-[0.5em] text-slate-800">SZE-IVK-IT-2026</p>
           <p className="text-[9px] text-slate-800 font-medium italic">it.sze.hu/assistant</p>
         </footer>

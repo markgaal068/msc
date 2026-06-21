@@ -6,30 +6,36 @@ import DashboardView from "@/components/DashboardView"
 
 export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null)
+  const [user, setUser] = useState<{ email: string; name: string } | null>(null)
 
-  // Ellenőrizzük a korábbi belépést az oldal betöltésekor
   useEffect(() => {
-    const user = localStorage.getItem("sze_user")
-    setIsLoggedIn(!!user)
+    const stored = localStorage.getItem("sze_user")
+    if (stored) {
+      setUser(JSON.parse(stored))
+      setIsLoggedIn(true)
+    } else {
+      setIsLoggedIn(false)
+    }
   }, [])
 
-  const handleAuthSuccess = (user: { email: string; name: string }) => {
-    localStorage.setItem("sze_user", JSON.stringify(user))
+  const handleAuthSuccess = (userData: { email: string; name: string }) => {
+    localStorage.setItem("sze_user", JSON.stringify(userData))
+    setUser(userData)
     setIsLoggedIn(true)
   }
 
   const handleLogout = () => {
     localStorage.removeItem("sze_user")
+    setUser(null)
     setIsLoggedIn(false)
   }
 
-  // Megakadályozza a felvillanást, amíg a localStorage tölt
   if (isLoggedIn === null) {
     return <div className="h-screen w-full bg-[#fcfcfc]" />
   }
 
-  return isLoggedIn ? (
-    <DashboardView onLogout={handleLogout} />
+  return isLoggedIn && user ? (
+    <DashboardView onLogout={handleLogout} user={user} />
   ) : (
     <AuthView onAuthSuccess={handleAuthSuccess} />
   )

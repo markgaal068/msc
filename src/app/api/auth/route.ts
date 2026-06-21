@@ -64,24 +64,35 @@ export async function POST(req: Request) {
     user.totp = { code: totpCode, expiresAt };
     await user.save();
 
+    const totpEmailHtml = `
+      <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #f0f0f0;">
+        <h2 style="color: #004685; text-transform: uppercase;">Biztonsági kód</h2>
+        <p>Kedves ${user.name || "Hallgató"}!</p>
+        <p>A belépéshez vagy regisztrációhoz szükséges 6 számjegyű azonosító kódod:</p>
+        <div style="background: #f4f4f5; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #1a1a1a; margin: 20px 0;">
+          ${totpCode}
+        </div>
+        <p style="color: #ef4444; font-size: 12px;">A kód biztonsági okokból <strong>5 percig</strong> érvényes.</p>
+        <hr style="border: none; border-top: 1px solid #f0f0f0; margin-top: 30px;" />
+        <p style="font-size: 10px; color: #a1a1aa; text-align: center;">SZE-IVK Informatika Tanszék</p>
+      </div>
+    `;
+
     // VALÓDI E-MAIL KÜLDÉS NODEMAILER-REL (GMAIL SMTP)
     await sendEmail({
       to: cleanEmail,
       subject: "SZE Digital Assistant - Kétlépcsős azonosító kód",
-      html: `
-        <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #f0f0f0;">
-          <h2 style="color: #004685; text-transform: uppercase;">Biztonsági kód</h2>
-          <p>Kedves ${user.name || "Hallgató"}!</p>
-          <p>A belépéshez vagy regisztrációhoz szükséges 6 számjegyű azonosító kódod:</p>
-          <div style="background: #f4f4f5; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #1a1a1a; margin: 20px 0;">
-            ${totpCode}
-          </div>
-          <p style="color: #ef4444; font-size: 12px;">A kód biztonsági okokból <strong>5 percig</strong> érvényes.</p>
-          <hr style="border: none; border-top: 1px solid #f0f0f0; margin-top: 30px;" />
-          <p style="font-size: 10px; color: #a1a1aa; text-align: center;">SZE-IVK Informatika Tanszék</p>
-        </div>
-      `,
+      html: totpEmailHtml,
     });
+
+    // Biztonsági e-mail küldés, ha engedélyezve van
+    if (user.securityEmail && user.securityEmailEnabled) {
+      await sendEmail({
+        to: user.securityEmail,
+        subject: "SZE Digital Assistant - Kétlépcsős azonosító kód",
+        html: totpEmailHtml,
+      }).catch(() => {});
+    }
 
     return NextResponse.json({ 
       success: true, 
