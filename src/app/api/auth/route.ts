@@ -59,10 +59,16 @@ export async function POST(req: Request) {
     for (let i = 0; i < 6; i++) {
       totpCode += Math.floor(Math.random() * 10).toString();
     }
-    const expiresAt = Date.now() + 5 * 60 * 1000; // Pontosan 5 perc
+    const expiresAt = Date.now() + 5 * 60 * 1000;
 
-    user.totp = { code: totpCode, expiresAt };
-    await user.save();
+    // Csak a totp mezőt írjuk, a többi mező (securityEmail stb.) érintetlen marad
+    await User.updateOne(
+      { email: cleanEmail },
+      { $set: { totp: { code: totpCode, expiresAt } } }
+    );
+
+    // Frissen olvassuk vissza a securityEmail beállításokat (lean = nyers DB adat)
+    const freshUser = await User.findOne({ email: cleanEmail }).lean() as any;
 
     const totpEmailHtml = `
       <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #f0f0f0;">
@@ -78,17 +84,17 @@ export async function POST(req: Request) {
       </div>
     `;
 
-    // VALÓDI E-MAIL KÜLDÉS NODEMAILER-REL (GMAIL SMTP)
+    // Mindig kiküldjük az elsődleges (egyetemi) e-mailre
     await sendEmail({
       to: cleanEmail,
       subject: "SZE Digital Assistant - Kétlépcsős azonosító kód",
       html: totpEmailHtml,
     });
 
-    // Biztonsági e-mail küldés, ha engedélyezve van
-    if (user.securityEmail && user.securityEmailEnabled) {
+    // HA van biztonsági e-mail és engedélyezett, ugyanazt a kódot oda is kiküldjük
+    if (freshUser?.securityEmail && freshUser?.securityEmailEnabled) {
       await sendEmail({
-        to: user.securityEmail,
+        to: freshUser.securityEmail,
         subject: "SZE Digital Assistant - Kétlépcsős azonosító kód",
         html: totpEmailHtml,
       }).catch(() => {});
