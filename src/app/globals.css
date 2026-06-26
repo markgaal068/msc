@@ -129,6 +129,12 @@
   }
 }
 
+@keyframes loading-bar {
+  0%   { transform: translateX(-100%); width: 40%; }
+  50%  { transform: translateX(150%);  width: 60%; }
+  100% { transform: translateX(400%);  width: 40%; }
+}
+
 button:not(:disabled),
 [type="button"]:not(:disabled),
 [type="submit"]:not(:disabled),

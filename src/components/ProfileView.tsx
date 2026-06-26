@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Camera, Lock, Mail, CheckCircle2, AlertCircle } from "lucide-react"
+import { Camera, Lock, Mail, CheckCircle2, AlertCircle, Loader2 } from "lucide-react"
 
 interface ProfileViewProps {
   user: { email: string; name: string }
@@ -183,7 +183,7 @@ export default function ProfileView({ user }: ProfileViewProps) {
                 disabled={pwLoading || !passwords.current || !passwords.new || !passwords.confirm}
                 className="bg-[#004685] hover:bg-[#97c93e] text-white rounded-none px-10 py-5 text-[10px] font-black uppercase tracking-widest transition-colors"
               >
-                {pwLoading ? "Mentés..." : "Jelszó mentése"}
+                {pwLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Jelszó mentése"}
               </Button>
             </div>
           </form>
@@ -224,7 +224,7 @@ export default function ProfileView({ user }: ProfileViewProps) {
                 disabled={secLoading}
                 className="bg-[#97c93e] hover:bg-[#004685] text-white rounded-none px-10 py-5 text-[10px] font-black uppercase tracking-widest transition-colors"
               >
-                {secLoading ? "Mentés..." : "Beállítások mentése"}
+                {secLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Beállítások mentése"}
               </Button>
             </div>
           </form>

@@ -87,7 +87,7 @@ export async function POST(req: Request) {
     // Mindig kiküldjük az elsődleges (egyetemi) e-mailre
     await sendEmail({
       to: cleanEmail,
-      subject: "SZE Digital Assistant - Kétlépcsős azonosító kód",
+      subject: "SZESSISTANT - Kétlépcsős azonosító kód",
       html: totpEmailHtml,
     });
 
@@ -95,7 +95,7 @@ export async function POST(req: Request) {
     if (freshUser?.securityEmail && freshUser?.securityEmailEnabled) {
       await sendEmail({
         to: freshUser.securityEmail,
-        subject: "SZE Digital Assistant - Kétlépcsős azonosító kód",
+        subject: "SZESSISTANT - Kétlépcsős azonosító kód",
         html: totpEmailHtml,
       }).catch(() => {});
     }

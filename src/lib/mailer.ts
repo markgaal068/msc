@@ -6,7 +6,7 @@ const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
 const smtpPort = parseInt(process.env.SMTP_PORT || "587", 10);
 const smtpUser = process.env.SMTP_USER || "";
 const smtpPass = process.env.SMTP_PASS || "";
-const smtpFrom = process.env.SMTP_FROM || `"Digital Assistant" <${smtpUser}>`;
+const smtpFrom = process.env.SMTP_FROM || `"SZESSISTANT" <${smtpUser}>`;
 
 const transporter = nodemailer.createTransport({
   host: smtpHost,

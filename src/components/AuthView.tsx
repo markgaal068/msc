@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Lock, User, Mail, AlertCircle, CheckCircle2, HelpCircle, X, ShieldCheck } from "lucide-react"
+import { Lock, User, Mail, AlertCircle, CheckCircle2, HelpCircle, X, ShieldCheck, Loader2 } from "lucide-react"
 
 interface AuthViewProps {
   onAuthSuccess: (user: { email: string; name: string }) => void
@@ -17,107 +17,100 @@ interface TotpState {
 export default function AuthView({ onAuthSuccess }: AuthViewProps) {
   const [authMode, setAuthMode] = useState<"login" | "register" | "totp">("login")
   const [authInputs, setAuthInputs] = useState({ email: "", password: "", name: "" })
-  
+
   const [totpState, setTotpState] = useState<TotpState | null>(null)
   const [inputTotp, setInputTotp] = useState("")
 
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [loading, setLoading] = useState<"submit" | "verify" | "resend" | "forgot" | null>(null)
 
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false)
   const [forgotEmail, setForgotEmail] = useState("")
   const [modalMessage, setModalMessage] = useState<{ type: "error" | "success"; text: string } | null>(null)
 
-  // 1. LÉPÉS: Regisztráció vagy Login indítása
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setSuccess(null)
-
+  // Shared code-sending logic (used by submit + resend)
+  const sendCode = async (loadingKey: "submit" | "resend") => {
     const email = authInputs.email.trim().toLowerCase()
-
     if (!email.endsWith("@sze.hu") && !email.endsWith("@student.sze.hu")) {
       setError("Kizárólag egyetemi (@sze.hu vagy @student.sze.hu) e-mail címmel lehet belépni!")
       return
     }
-
-    const action = authMode === "register" ? "register" : "login"
-
+    setLoading(loadingKey)
     try {
       const res = await fetch("/api/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action,
+          action: authMode === "register" ? "register" : "login",
           email: authInputs.email,
-          password: authInputs.password, // Pontos változónév egyezés a backenddel
+          password: authInputs.password,
           name: authInputs.name,
         }),
       })
-
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Szerveroldali hiba történt.")
-
-      setTotpState({
-        expiresAt: Date.now() + 5 * 60 * 1000,
-        targetUser: data.user,
-      })
-      
+      setTotpState({ expiresAt: Date.now() + 5 * 60 * 1000, targetUser: data.user })
       setAuthMode("totp")
       setSuccess("A biztonsági kódot elküldtük az egyetemi e-mail címedre! Kérjük, ellenőrizd a postafiókodat. (A kód 5 percig érvényes)")
     } catch (err: any) {
       setError(err.message)
+    } finally {
+      setLoading(null)
     }
   }
 
-  // 2. LÉPÉS: TOTP kód hitelesítése
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setSuccess(null)
+    await sendCode("submit")
+  }
+
+  const handleResendCode = async () => {
+    setError(null)
+    await sendCode("resend")
+  }
+
   const handleTotpVerify = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-
     if (!totpState) return
-
+    setLoading("verify")
     try {
       const res = await fetch("/api/auth/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: totpState.targetUser.email,
-          code: inputTotp,
-        }),
+        body: JSON.stringify({ email: totpState.targetUser.email, code: inputTotp }),
       })
-
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Hibás kód vagy lejárt munkamenet.")
-
       setSuccess(null)
       onAuthSuccess(data.user)
     } catch (err: any) {
       setError(err.message)
+    } finally {
+      setLoading(null)
     }
   }
 
-  // 3. LÉPÉS: Elfelejtett jelszó lekérése
   const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setModalMessage(null)
-
+    setLoading("forgot")
     try {
       const res = await fetch("/api/auth/forgot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: forgotEmail }),
       })
-
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Hiba a lekérés során.")
-
-      setModalMessage({
-        type: "success",
-        text: "Az új ideiglenes jelszót sikeresen elküldtük az e-mail címedre!",
-      })
+      setModalMessage({ type: "success", text: "Az új ideiglenes jelszót sikeresen elküldtük az e-mail címedre!" })
     } catch (err: any) {
       setModalMessage({ type: "error", text: err.message })
+    } finally {
+      setLoading(null)
     }
   }
 
@@ -133,24 +126,31 @@ export default function AuthView({ onAuthSuccess }: AuthViewProps) {
       <div className={`absolute -top-40 -left-40 w-96 h-96 rounded-full blur-3xl opacity-10 transition-colors duration-700 ${authMode === 'register' ? 'bg-[#97c93e]' : 'bg-[#004685]'}`} />
       <div className={`absolute -bottom-40 -right-40 w-96 h-96 rounded-full blur-3xl opacity-10 transition-colors duration-700 ${authMode === 'register' ? 'bg-[#004685]' : 'bg-[#97c93e]'}`} />
 
+      {/* Top loading bar */}
+      {loading && (
+        <div className="fixed top-0 left-0 right-0 h-0.5 z-50 overflow-hidden bg-transparent">
+          <div className={`h-full animate-[loading-bar_1.4s_ease-in-out_infinite] ${authMode === 'register' ? 'bg-[#97c93e]' : 'bg-[#004685]'}`} />
+        </div>
+      )}
+
       <div className="w-full max-w-md bg-white border border-slate-100 p-8 shadow-xl relative z-10 transition-all duration-300">
         <header className="text-center mb-8">
           <h1 className="text-2xl font-black tracking-tighter text-[#004685] uppercase">
-            Digital <span className="text-[#97c93e]">Assistant</span>
+            <span className="text-[#004685]">SZE</span><span className="text-[#97c93e]">SSISTANT</span>
           </h1>
           <p className="text-[9px] font-bold tracking-[0.2em] text-slate-400 uppercase mt-1">SZE-IVK Informatika Tanszék</p>
         </header>
 
         {authMode !== "totp" && (
           <div className="flex border-b border-slate-100 mb-6">
-            <button 
+            <button
               type="button"
               onClick={() => handleModeChange("login")}
               className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider transition-all rounded-none ${authMode === "login" ? "border-b-2 border-[#004685] text-[#004685] opacity-100" : "opacity-40 hover:opacity-70"}`}
             >
               Bejelentkezés
             </button>
-            <button 
+            <button
               type="button"
               onClick={() => handleModeChange("register")}
               className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider transition-all rounded-none ${authMode === "register" ? "border-b-2 border-[#97c93e] text-[#97c93e] opacity-100" : "opacity-40 hover:opacity-70"}`}
@@ -179,9 +179,9 @@ export default function AuthView({ onAuthSuccess }: AuthViewProps) {
             {authMode === "register" && (
               <div className="relative">
                 <User className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-                <Input 
-                  type="text" 
-                  placeholder="Teljes név" 
+                <Input
+                  type="text"
+                  placeholder="Teljes név"
                   required
                   value={authInputs.name}
                   onChange={(e) => setAuthInputs(prev => ({ ...prev, name: e.target.value }))}
@@ -192,9 +192,9 @@ export default function AuthView({ onAuthSuccess }: AuthViewProps) {
 
             <div className="relative">
               <Mail className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-              <Input 
-                type="email" 
-                placeholder="Egyetemi e-mail cím (@sze.hu)" 
+              <Input
+                type="email"
+                placeholder="Egyetemi e-mail cím (@sze.hu)"
                 required
                 value={authInputs.email}
                 onChange={(e) => setAuthInputs(prev => ({ ...prev, email: e.target.value }))}
@@ -204,9 +204,9 @@ export default function AuthView({ onAuthSuccess }: AuthViewProps) {
 
             <div className="relative">
               <Lock className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-              <Input 
-                type="password" 
-                placeholder="Jelszó" 
+              <Input
+                type="password"
+                placeholder="Jelszó"
                 required
                 value={authInputs.password}
                 onChange={(e) => setAuthInputs(prev => ({ ...prev, password: e.target.value }))}
@@ -216,9 +216,9 @@ export default function AuthView({ onAuthSuccess }: AuthViewProps) {
 
             {authMode === "login" && (
               <div className="text-right">
-                <button 
+                <button
                   type="button"
-                  onClick={() => { setIsForgotModalOpen(true); setModalMessage(null); setForgotEmail(""); }}
+                  onClick={() => { setIsForgotModalOpen(true); setModalMessage(null); setForgotEmail("") }}
                   className="text-[10px] text-slate-400 hover:text-[#004685] transition-colors font-medium"
                 >
                   Elfelejtettem a jelszavam
@@ -226,11 +226,14 @@ export default function AuthView({ onAuthSuccess }: AuthViewProps) {
               </div>
             )}
 
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
+              disabled={loading !== null}
               className={`w-full h-12 rounded-none font-bold uppercase tracking-widest text-[10px] text-white shadow-md transition-all duration-300 ${authMode === 'register' ? 'bg-[#97c93e] hover:bg-[#004685]' : 'bg-[#004685] hover:bg-[#97c93e]'}`}
             >
-              {authMode === "login" ? "Kód igénylése" : "Regisztráció és kód küldése"}
+              {loading === "submit"
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : authMode === "login" ? "Kód igénylése" : "Regisztráció és kód küldése"}
             </Button>
           </form>
         ) : (
@@ -246,10 +249,10 @@ export default function AuthView({ onAuthSuccess }: AuthViewProps) {
             </div>
 
             <div className="relative">
-              <Input 
-                type="text" 
+              <Input
+                type="text"
                 maxLength={6}
-                placeholder="000000" 
+                placeholder="000000"
                 required
                 value={inputTotp}
                 onChange={(e) => setInputTotp(e.target.value.replace(/\D/g, ""))}
@@ -258,22 +261,32 @@ export default function AuthView({ onAuthSuccess }: AuthViewProps) {
             </div>
 
             <div className="flex flex-col space-y-3">
-              <Button type="submit" className="w-full h-12 bg-[#004685] hover:bg-[#97c93e] rounded-none font-bold uppercase tracking-widest text-[10px] text-white shadow-md">
-                Azonosítás és Belépés
-              </Button>
-              
-              <button 
-                type="button"
-                onClick={handleSubmit}
-                className="text-[10px] text-slate-400 hover:text-[#004685] transition-colors font-bold uppercase tracking-wider"
+              <Button
+                type="submit"
+                disabled={loading !== null}
+                className="w-full h-12 bg-[#004685] hover:bg-[#97c93e] rounded-none font-bold uppercase tracking-widest text-[10px] text-white shadow-md"
               >
-                Új kód kérése
+                {loading === "verify"
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : "Azonosítás és Belépés"}
+              </Button>
+
+              <button
+                type="button"
+                onClick={handleResendCode}
+                disabled={loading !== null}
+                className="text-[10px] text-slate-400 hover:text-[#004685] transition-colors font-bold uppercase tracking-wider disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                {loading === "resend"
+                  ? <><Loader2 className="w-3 h-3 animate-spin" /> Küldés...</>
+                  : "Új kód kérése"}
               </button>
 
-              <button 
+              <button
                 type="button"
                 onClick={() => handleModeChange("login")}
-                className="text-[9px] text-slate-400 hover:text-red-500 transition-colors font-medium"
+                disabled={loading !== null}
+                className="text-[9px] text-slate-400 hover:text-red-500 transition-colors font-medium disabled:opacity-40"
               >
                 Vissza a bejelentkezéshez
               </button>
@@ -293,7 +306,7 @@ export default function AuthView({ onAuthSuccess }: AuthViewProps) {
               <h3 className="text-sm font-bold uppercase tracking-wider text-[#004685]">Jelszó emlékeztető</h3>
             </div>
             <p className="text-xs text-slate-400 font-light mb-4">Add meg a regisztrált egyetemi e-mail címedet a jelszavad kikereséséhez.</p>
-            
+
             {modalMessage && (
               <div className={`mb-4 p-3 border text-xs ${modalMessage.type === "success" ? "bg-emerald-50 border-emerald-100 text-emerald-700" : "bg-red-50 border-red-100 text-red-600"}`}>
                 {modalMessage.text}
@@ -301,16 +314,22 @@ export default function AuthView({ onAuthSuccess }: AuthViewProps) {
             )}
 
             <form onSubmit={handleForgotPasswordSubmit} className="space-y-3">
-              <Input 
-                type="email" 
-                placeholder="E-mail cím (@sze.hu)" 
-                required 
-                value={forgotEmail} 
-                onChange={(e) => setForgotEmail(e.target.value)} 
-                className="border-slate-200 rounded-none h-10 focus-visible:ring-0 focus-visible:border-[#004685]" 
+              <Input
+                type="email"
+                placeholder="E-mail cím (@sze.hu)"
+                required
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                className="border-slate-200 rounded-none h-10 focus-visible:ring-0 focus-visible:border-[#004685]"
               />
-              <Button type="submit" className="w-full bg-[#004685] hover:bg-[#97c93e] rounded-none h-10 text-[10px] uppercase font-bold tracking-wider text-white">
-                Jelszó lekérése
+              <Button
+                type="submit"
+                disabled={loading === "forgot"}
+                className="w-full bg-[#004685] hover:bg-[#97c93e] rounded-none h-10 text-[10px] uppercase font-bold tracking-wider text-white"
+              >
+                {loading === "forgot"
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : "Jelszó lekérése"}
               </Button>
             </form>
           </div>

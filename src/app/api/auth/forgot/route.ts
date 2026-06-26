@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     // Kiküldés Nodemailer-rel
     await sendEmail({
       to: user.email,
-      subject: "SZE Digital Assistant - Ideiglenes jelszó",
+      subject: "SZESSISTANT - Ideiglenes jelszó",
       html: `
         <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #f0f0f0;">
           <h2 style="color: #004685;">Ideiglenes jelszó generálva</h2>
