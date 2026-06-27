@@ -129,6 +129,11 @@
   }
 }
 
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30%            { transform: translateY(-4px); opacity: 1; }
+}
+
 @keyframes loading-bar {
   0%   { transform: translateX(-100%); width: 40%; }
   50%  { transform: translateX(150%);  width: 60%; }

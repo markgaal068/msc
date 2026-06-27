@@ -24,7 +24,8 @@ const UserSchema = new Schema<IUser>({
   totp: {
     code: { type: String, default: null },
     expiresAt: { type: Number, default: null },
-  }
+  },
+  favorites: { type: [String], default: [] },
 }, { timestamps: true });
 
 // Next.js specifikus export: ha már létezik a modell, azt használja, ha nem, létrehozza

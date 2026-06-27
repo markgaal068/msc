@@ -1,15 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2, Upload, User, FileText, X, Download, Save, CheckCircle2 } from "lucide-react"
+import { Loader2, Upload, User, FileText, X, Download, Save, CheckCircle2, MessageSquare } from "lucide-react"
 import ReactMarkdown from 'react-markdown'
 import ProfileView from "@/components/ProfileView"
 import FilesView from "@/components/FilesView"
+import ChatView from "@/components/ChatView"
 
-type Section = "main" | "profile" | "files"
+type Section = "main" | "profile" | "files" | "chat"
 type FileType = "faq" | "reflexio" | "hangjegyzet" | "teszt" | "megoldokulcs"
 
 interface DashboardViewProps {
@@ -125,6 +126,23 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
   const [saveModal, setSaveModal]   = useState<SaveModal | null>(null)
   const [saveLoading, setSaveLoading] = useState(false)
   const [savedToast, setSavedToast]   = useState(false)
+
+  // Chat unread badge
+  const [totalUnread, setTotalUnread] = useState(0)
+
+  const fetchUnread = useCallback(async () => {
+    try {
+      const res  = await fetch(`/api/direct/conversations?email=${encodeURIComponent(user.email)}`)
+      const data = await res.json()
+      setTotalUnread(data.total ?? 0)
+    } catch { /* ignore */ }
+  }, [user.email])
+
+  useEffect(() => {
+    fetchUnread()
+    const iv = setInterval(fetchUnread, 5000)
+    return () => clearInterval(iv)
+  }, [fetchUnread])
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -452,13 +470,32 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
           <div className="flex items-center space-x-6">
             <span className="text-[10px] font-bold tracking-[0.3em] text-slate-800 uppercase">SZE-IVK Informatika tanszék</span>
             <div className="relative" onMouseEnter={() => setShowMenu(true)} onMouseLeave={() => setShowMenu(false)}>
-              <button className="w-9 h-9 rounded-full bg-[#97c93e] flex items-center justify-center hover:opacity-90 transition-opacity">
+              <button className="w-9 h-9 rounded-full bg-[#97c93e] flex items-center justify-center hover:opacity-90 transition-opacity relative">
                 <User className="w-5 h-5 text-white" />
+                {totalUnread > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#004685] text-white text-[9px] font-black flex items-center justify-center border-2 border-white">
+                    {totalUnread > 9 ? "9+" : totalUnread}
+                  </span>
+                )}
               </button>
               {showMenu && (
-                <div className="absolute right-0 top-full w-44 bg-[#97c93e] shadow-lg z-50">
+                <div className="absolute right-0 top-full w-48 bg-[#97c93e] shadow-lg z-50">
                   <button onClick={() => { setCurrentSection("profile"); setShowMenu(false) }} className="w-full text-left px-4 py-3 text-white text-[11px] font-bold uppercase tracking-wider hover:bg-[#87b935] transition-colors">Profil</button>
                   <button onClick={() => { setCurrentSection("files"); setShowMenu(false) }} className="w-full text-left px-4 py-3 text-white text-[11px] font-bold uppercase tracking-wider hover:bg-[#87b935] transition-colors">Fileok</button>
+                  <button
+                    onClick={() => { setCurrentSection("chat"); setShowMenu(false) }}
+                    className="w-full text-left px-4 py-3 text-white text-[11px] font-bold uppercase tracking-wider hover:bg-[#87b935] transition-colors flex items-center justify-between"
+                  >
+                    <span className="flex items-center gap-2">
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      Csevegés
+                    </span>
+                    {totalUnread > 0 && (
+                      <span className="w-5 h-5 rounded-full bg-[#004685] text-white text-[9px] font-black flex items-center justify-center shrink-0">
+                        {totalUnread > 9 ? "9+" : totalUnread}
+                      </span>
+                    )}
+                  </button>
                   <div className="border-t border-white/30">
                     <button onClick={onLogout} className="w-full text-left px-4 py-3 text-white text-[11px] font-bold uppercase tracking-wider hover:bg-[#87b935] transition-colors">Kijelentkezés</button>
                   </div>
@@ -470,6 +507,9 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
 
         {currentSection === "profile" && <ProfileView user={user} />}
         {currentSection === "files"   && <FilesView user={user} />}
+        {currentSection === "chat"    && (
+          <ChatView user={user} onUnreadChange={setTotalUnread} />
+        )}
 
         <Tabs defaultValue="faq" className={`flex-1 flex flex-col min-h-0 ${currentSection !== "main" ? "hidden" : ""}`}>
           <TabsList className="bg-transparent h-auto p-0 mb-8 border-b border-slate-100 w-full justify-start space-x-10 shrink-0">
