@@ -487,7 +487,6 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
                     className="w-full text-left px-4 py-3 text-white text-[11px] font-bold uppercase tracking-wider hover:bg-[#87b935] transition-colors flex items-center justify-between"
                   >
                     <span className="flex items-center gap-2">
-                      <MessageSquare className="w-3.5 h-3.5" />
                       Csevegés
                     </span>
                     {totalUnread > 0 && (
