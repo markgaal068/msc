@@ -12,6 +12,7 @@ export interface IUser extends Document {
     code: string | null;
     expiresAt: number | null;
   };
+  favorites: string[];
 }
 
 const UserSchema = new Schema<IUser>({
