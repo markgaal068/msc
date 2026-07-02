@@ -11,7 +11,7 @@ import FilesView from "@/components/FilesView"
 import ChatView from "@/components/ChatView"
 
 type Section = "main" | "profile" | "files" | "chat"
-type FileType = "faq" | "reflexio" | "hangjegyzet" | "teszt" | "megoldokulcs"
+type FileType = "faq" | "reflexio" | "hangjegyzet" | "teszt" | "megoldokulcs" | "moodle"
 
 interface DashboardViewProps {
   onLogout: () => void
@@ -26,6 +26,8 @@ interface TestSettings {
   includeScoring: boolean
   includeAnswerKey: boolean
   answerKeyFileName: string
+  includeGift: boolean
+  giftFileName: string
 }
 
 interface SaveModal {
@@ -99,6 +101,16 @@ async function downloadAsDocx(content: string, filename: string) {
   URL.revokeObjectURL(url)
 }
 
+function downloadAsText(content: string, filename: string) {
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `${filename}.txt`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function DashboardView({ onLogout, user }: DashboardViewProps) {
@@ -119,8 +131,10 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
     includeScoring:    true,
     includeAnswerKey:  false,
     answerKeyFileName: "megoldokulcs",
+    includeGift:       false,
+    giftFileName:      "moodle_gift",
   })
-  const [testResult, setTestResult] = useState<{ test: string; answerKey?: string } | null>(null)
+  const [testResult, setTestResult] = useState<{ test: string; answerKey?: string; gift?: string } | null>(null)
 
   // Save state
   const [saveModal, setSaveModal]   = useState<SaveModal | null>(null)
@@ -224,6 +238,9 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
       questionCounts: { ...prev.questionCounts, [id]: Math.max(1, Math.min(50, value || 1)) },
     }))
 
+  const isGiftEligible = testSettings.taskTypes.length > 0 &&
+    testSettings.taskTypes.every(t => t === "truefalse" || t === "multiple")
+
   const handleGenerateTest = async () => {
     if (!testPdfs.length || !testSettings.taskTypes.length) return
     setShowTestModal(false)
@@ -232,7 +249,10 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
     try {
       const formData = new FormData()
       testPdfs.forEach(f => formData.append("files", f))
-      formData.append("settings", JSON.stringify(testSettings))
+      formData.append("settings", JSON.stringify({
+        ...testSettings,
+        includeGift: testSettings.includeGift && isGiftEligible,
+      }))
       const res  = await fetch("/api/generate-test", { method: "POST", body: formData })
       const data = await res.json()
       if (!res.ok || data.error) throw new Error(data.error || "Ismeretlen hiba")
@@ -435,6 +455,36 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
                       value={testSettings.answerKeyFileName}
                       onChange={e => setTestSettings(prev => ({ ...prev, answerKeyFileName: e.target.value }))}
                       className="w-full border border-slate-200 px-3 py-2 text-sm font-light focus:outline-none focus:border-[#97c93e] rounded-none"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Moodle GIFT export */}
+              <div className="space-y-3">
+                <div
+                  title={!isGiftEligible ? "Csak igaz-hamis vagy feleletválasztós kérdések esetén elérhető!" : undefined}
+                  className="inline-block"
+                >
+                  <label className={`flex items-center gap-3 ${!isGiftEligible ? "cursor-not-allowed opacity-40" : "cursor-pointer"}`}>
+                    <input
+                      type="checkbox"
+                      checked={testSettings.includeGift && isGiftEligible}
+                      onChange={e => setTestSettings(prev => ({ ...prev, includeGift: e.target.checked }))}
+                      disabled={!isGiftEligible}
+                      className="accent-[#004685] w-4 h-4"
+                    />
+                    <span className="text-[11px] font-bold uppercase tracking-wider">Moodle GIFT exportálása (.txt)</span>
+                  </label>
+                </div>
+                {testSettings.includeGift && isGiftEligible && (
+                  <div className="ml-7">
+                    <label className="text-[9px] font-bold uppercase tracking-[0.25em] text-slate-400 block mb-2">GIFT fájl neve</label>
+                    <input
+                      type="text"
+                      value={testSettings.giftFileName}
+                      onChange={e => setTestSettings(prev => ({ ...prev, giftFileName: e.target.value }))}
+                      className="w-full border border-slate-200 px-3 py-2 text-sm font-light focus:outline-none focus:border-[#004685] rounded-none"
                     />
                   </div>
                 )}
@@ -694,6 +744,24 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
                         >
                           <Download className="w-3 h-3" /> Megoldókulcs (.docx)
                         </Button>
+                      )}
+                      {testResult.gift && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            className="h-7 text-[9px] uppercase font-bold text-[#97c93e] gap-1"
+                            onClick={() => openSaveModal("moodle", testResult.gift!, testSettings.giftFileName)}
+                          >
+                            <Save className="w-3 h-3" /> GIFT mentése
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="h-7 text-[9px] uppercase rounded-none gap-1.5 border-[#004685] text-[#004685] hover:bg-[#004685]/5"
+                            onClick={() => downloadAsText(testResult.gift!, testSettings.giftFileName)}
+                          >
+                            <Download className="w-3 h-3" /> GIFT (.txt)
+                          </Button>
+                        </>
                       )}
                       <Button
                         variant="ghost"

@@ -13,7 +13,7 @@ const DIFFICULTY_LABELS: Record<string, string> = {
 const TASK_TYPE_LABELS: Record<string, string> = {
   essay: "Esszé kérdések (részletes kifejtést igénylő, min. fél oldalas válasz)",
   short: "Rövid kifejtős kérdések (2-5 mondatos válasz)",
-  multiple: "Többválasztós kérdések (4 lehetséges válasz, 1 helyes)",
+  multiple: "Többválasztós kérdések (4 lehetséges válasz, 1 VAGY TÖBB helyes is lehetséges — a tananyag alapján döntsd el; minden kérdésnél jelöld meg, hány helyes válasz van)",
   truefalse: "Igaz/Hamis állítások (indoklással)",
 };
 
@@ -31,7 +31,8 @@ export async function POST(req: Request) {
     }
 
     const settings = JSON.parse(settingsRaw);
-    const { testFileName, difficulty, taskTypes, questionCounts, includeScoring, includeAnswerKey } = settings;
+    const { testFileName, difficulty, taskTypes, questionCounts, includeScoring, includeAnswerKey, includeGift } = settings;
+    const giftEligible = !!includeGift && (taskTypes as string[]).every((t: string) => t === "truefalse" || t === "multiple");
 
     // Extract text from all PDFs
     const pdfTexts: string[] = [];
@@ -57,6 +58,49 @@ export async function POST(req: Request) {
       .filter(Boolean)
       .join("\n");
 
+    const giftInstructions = giftEligible ? `
+
+MOODLE GIFT EXPORTÁLÁS:
+A Markdown teszt után add meg ugyanezt GIFT formátumban is, PONTOSAN ebben a struktúrában (ne hagyj ki egyetlen kérdést sem):
+
+---GIFT FORMAT---
+$CATEGORY: ${testFileName}
+
+// question: 1  name: 01
+// Példa: 1 helyes válasz (helyes: 100%; helytelen: -100%)
+::01::Kérdés szövege?{
+\t~%100%Helyes válasz
+\t~%-100%Helytelen válasz 1
+\t~%-100%Helytelen válasz 2
+\t~%-100%Helytelen válasz 3
+}
+
+// question: 2  name: 02
+// Példa: 2 helyes válasz (mindkettő 50%-ot ér, összesen 100%; helytelen: -100%)
+::02::Kérdés szövege?{
+\t~%50%Helyes válasz 1
+\t~%50%Helyes válasz 2
+\t~%-100%Helytelen válasz 1
+\t~%-100%Helytelen válasz 2
+}
+
+// question: 3  name: 03
+// Példa: igaz-hamis
+::03::Állítás szövege.{TRUE}
+
+---END GIFT---
+
+GIFT PONTOZÁSI SZABÁLYOK (KÖTELEZŐ BETARTANI):
+1. Ha 1 helyes válasz van: = jelöli a helyes választ (100%), ~%-100%Szöveg a helytelent
+2. Ha N > 1 helyes válasz van: minden helyes válasz ~%(100/N)% formátummal (pl. 2 helyes → ~%50%, 3 helyes → ~%33.33333%)
+3. Helytelen válasz MINDIG ~%-100%Szöveg (minden rossz válasz -100% büntetést kap)
+4. Az összes helyes válasz %-ának összege pontosan 100% legyen
+5. Igaz-hamisnál: {TRUE} ha igaz, {FALSE} ha hamis
+6. Ne használj HTML tageket
+7. Pontosan azonosítsd a helyes válasz(ok)at a tananyag alapján
+8. Számozás: 01, 02, 03...
+9. Csak a GIFT szöveget add meg a jelölők között, semmi mást!` : "";
+
     const systemPrompt = `Te egy egyetemi oktató asszisztens vagy, aki tesztek generálásában segít.
 
 SZIGORÚ SZABÁLYOK — ezektől nem térhetsz el:
@@ -71,7 +115,7 @@ FELADAT: Generálj egy tesztet a következő beállításokkal:
 ${selectedTypes}
 ${includeScoring ? "- Adj pontozást minden feladathoz (pl. 2 pont, 5 pont stb.)" : ""}
 
-Formázás: Markdown, feladattípusonként külön szekcióban (## fejléccel). A teszt tetején tüntesd fel a fájl nevét: "${testFileName}".`;
+Formázás: Markdown, feladattípusonként külön szekcióban (## fejléccel). A teszt tetején tüntesd fel a fájl nevét: "${testFileName}".${giftInstructions}`;
 
     const testResponse = await openai.chat.completions.create({
       model: "gpt-4o",
@@ -85,7 +129,17 @@ Formázás: Markdown, feladattípusonként külön szekcióban (## fejléccel). 
       temperature: 0.3,
     });
 
-    const testText = testResponse.choices[0].message.content ?? "";
+    let testText = testResponse.choices[0].message.content ?? "";
+    let gift: string | undefined;
+
+    if (giftEligible) {
+      const giftStart = testText.indexOf("---GIFT FORMAT---");
+      const giftEnd   = testText.indexOf("---END GIFT---");
+      if (giftStart !== -1 && giftEnd !== -1) {
+        gift     = testText.slice(giftStart + "---GIFT FORMAT---".length, giftEnd).trim();
+        testText = testText.slice(0, giftStart).trim();
+      }
+    }
 
     let answerKey: string | undefined;
     if (includeAnswerKey) {
@@ -111,7 +165,7 @@ Formázás: Markdown, ugyanolyan számozással mint a teszt.`,
       answerKey = answerKeyResponse.choices[0].message.content ?? "";
     }
 
-    return NextResponse.json({ test: testText, answerKey });
+    return NextResponse.json({ test: testText, answerKey, gift });
   } catch (error: any) {
     console.error("Teszt generálási hiba:", error);
     return NextResponse.json(

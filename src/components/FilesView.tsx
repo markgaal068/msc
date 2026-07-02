@@ -7,7 +7,7 @@ import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type FileType = "faq" | "reflexio" | "hangjegyzet" | "teszt" | "megoldokulcs"
+type FileType = "faq" | "reflexio" | "hangjegyzet" | "teszt" | "megoldokulcs" | "moodle"
 
 interface SavedFile {
   _id: string
@@ -29,6 +29,7 @@ const TYPE_META: Record<FileType, { label: string; bg: string; text: string }> =
   hangjegyzet:  { label: "Hangjegyzet",  bg: "bg-[#004685]/10", text: "text-[#004685]" },
   teszt:        { label: "Teszt",        bg: "bg-[#004685]/10", text: "text-[#004685]" },
   megoldokulcs: { label: "Megoldókulcs", bg: "bg-[#97c93e]/15", text: "text-[#4a7a1e]" },
+  moodle:       { label: "Moodle GIFT",  bg: "bg-[#004685]/10", text: "text-[#004685]" },
 }
 
 const FILTERS = [
@@ -38,7 +39,20 @@ const FILTERS = [
   { id: "hangjegyzet", label: "Hangjegyzet" },
   { id: "teszt",       label: "Teszt" },
   { id: "megoldokulcs",label: "Megoldókulcs" },
+  { id: "moodle",      label: "Moodle GIFT" },
 ] as const
+
+// ── plain-text download (for GIFT files) ─────────────────────────────────────
+
+function downloadAsText(content: string, filename: string) {
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `${filename}.txt`
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 // ── docx download ─────────────────────────────────────────────────────────────
 
@@ -105,6 +119,7 @@ export default function FilesView({ user }: FilesViewProps) {
   const [files, setFiles]         = useState<SavedFile[]>([])
   const [loading, setLoading]     = useState(true)
   const [filter, setFilter]       = useState<"all" | FileType>("all")
+  const [search, setSearch]       = useState("")
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const fetchFiles = useCallback(async () => {
@@ -130,7 +145,9 @@ export default function FilesView({ user }: FilesViewProps) {
     }
   }
 
-  const visible = filter === "all" ? files : files.filter(f => f.type === filter)
+  const visible = files
+    .filter(f => filter === "all" || f.type === filter)
+    .filter(f => !search.trim() || f.name.toLowerCase().includes(search.toLowerCase()))
 
   // Count per type for badges
   const counts = files.reduce<Record<string, number>>((acc, f) => {
@@ -146,6 +163,17 @@ export default function FilesView({ user }: FilesViewProps) {
         <h2 className="text-[11px] font-black uppercase tracking-[0.3em] text-[#004685] mb-5">
           Mentett Fájlok
         </h2>
+
+        {/* Search */}
+        <div className="mb-4">
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Keresés név alapján..."
+            className="w-full border border-slate-200 px-3 py-2 text-[12px] focus:outline-none focus:border-[#004685] rounded-none"
+          />
+        </div>
 
         {/* Filter pills */}
         <div className="flex flex-wrap gap-2">
@@ -184,7 +212,11 @@ export default function FilesView({ user }: FilesViewProps) {
           <div className="flex flex-col items-center justify-center h-48 space-y-3">
             <FileText className="w-8 h-8 text-slate-200" />
             <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-slate-300">
-              {filter === "all" ? "Még nincs mentett fájl" : `Nincs mentett ${TYPE_META[filter as FileType]?.label ?? ""}`}
+              {search.trim()
+                ? "Nincs találat"
+                : filter === "all"
+                  ? "Még nincs mentett fájl"
+                  : `Nincs mentett ${TYPE_META[filter as FileType]?.label ?? ""}`}
             </p>
           </div>
         ) : (
@@ -213,17 +245,29 @@ export default function FilesView({ user }: FilesViewProps) {
                     </div>
 
                     <p className="text-[11px] text-slate-400 italic leading-relaxed line-clamp-2 mb-4">
-                      {stripMarkdown(file.content).slice(0, 180)}
+                      {file.type === "moodle"
+                        ? file.content.slice(0, 180).replace(/\n+/g, " ")
+                        : stripMarkdown(file.content).slice(0, 180)}
                     </p>
 
                     <div className="flex justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        className="h-7 text-[9px] uppercase rounded-none gap-1.5 border-slate-200 hover:border-[#004685] hover:text-[#004685]"
-                        onClick={() => downloadAsDocx(file.content, file.name)}
-                      >
-                        <Download className="w-3 h-3" /> .docx
-                      </Button>
+                      {file.type === "moodle" ? (
+                        <Button
+                          variant="outline"
+                          className="h-7 text-[9px] uppercase rounded-none gap-1.5 border-slate-200 hover:border-[#004685] hover:text-[#004685]"
+                          onClick={() => downloadAsText(file.content, file.name)}
+                        >
+                          <Download className="w-3 h-3" /> .txt
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          className="h-7 text-[9px] uppercase rounded-none gap-1.5 border-slate-200 hover:border-[#004685] hover:text-[#004685]"
+                          onClick={() => downloadAsDocx(file.content, file.name)}
+                        >
+                          <Download className="w-3 h-3" /> .docx
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         className="h-7 text-[9px] uppercase rounded-none gap-1.5 border-slate-200 hover:border-red-400 hover:text-red-500"
