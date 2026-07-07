@@ -48,10 +48,10 @@ const DEFAULT_COUNTS: Record<string, number> = {
 }
 
 const TABS = [
-  { id: "faq",       label: "FAQ Generátor" },
-  { id: "wellbeing", label: "Reflexió" },
-  { id: "notes",     label: "Jegyzet Generátor" },
-  { id: "test",      label: "Teszt Generátor" },
+  { id: "faq",       label: "FAQ Generátor",     short: "FAQ" },
+  { id: "wellbeing", label: "Reflexió",           short: "Reflexió" },
+  { id: "notes",     label: "Jegyzet Generátor", short: "Jegyzet" },
+  { id: "test",      label: "Teszt Generátor",   short: "Teszt" },
 ]
 
 // ── Markdown → docx ──────────────────────────────────────────────────────────
@@ -307,7 +307,7 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
 
       {/* ── Save Modal ── */}
       {saveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="bg-white w-full max-w-sm shadow-2xl border border-slate-100">
             <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100">
               <h2 className="text-[11px] font-black uppercase tracking-[0.25em] text-[#004685]">
@@ -348,16 +348,16 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
 
       {/* ── Test Settings Modal ── */}
       {showTestModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="bg-white w-full max-w-md shadow-2xl border border-slate-100">
-            <div className="flex justify-between items-center px-8 py-5 border-b border-slate-100">
+            <div className="flex justify-between items-center px-5 sm:px-8 py-4 sm:py-5 border-b border-slate-100">
               <h2 className="text-[11px] font-black uppercase tracking-[0.25em] text-[#004685]">Teszt beállítások</h2>
               <button onClick={() => setShowTestModal(false)} className="text-slate-400 hover:text-[#004685] transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="px-8 py-6 space-y-6 max-h-[68vh] overflow-y-auto">
+            <div className="px-5 sm:px-8 py-5 sm:py-6 space-y-6 max-h-[72vh] sm:max-h-[68vh] overflow-y-auto">
               {/* File name */}
               <div>
                 <label className="text-[9px] font-bold uppercase tracking-[0.25em] text-slate-400 block mb-2">Generált file neve</label>
@@ -372,7 +372,7 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
               {/* Difficulty */}
               <div>
                 <label className="text-[9px] font-bold uppercase tracking-[0.25em] text-slate-400 block mb-3">Nehézség</label>
-                <div className="flex gap-6">
+                <div className="flex flex-wrap gap-4 sm:gap-6">
                   {(["easy", "medium", "hard"] as const).map((val, i) => (
                     <label key={val} className="flex items-center gap-2 cursor-pointer">
                       <input
@@ -491,14 +491,14 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 px-8 py-5 border-t border-slate-100">
+            <div className="flex justify-end gap-3 px-5 sm:px-8 py-4 sm:py-5 border-t border-slate-100">
               <Button variant="ghost" className="rounded-none text-[10px] uppercase font-bold tracking-widest" onClick={() => setShowTestModal(false)}>
                 Mégse
               </Button>
               <Button
                 onClick={handleGenerateTest}
                 disabled={!testSettings.taskTypes.length || !testSettings.testFileName.trim()}
-                className="bg-[#004685] hover:bg-[#97c93e] text-white rounded-none px-8 text-[10px] uppercase font-bold tracking-widest"
+                className="bg-[#004685] hover:bg-[#97c93e] text-white rounded-none px-6 sm:px-8 text-[10px] uppercase font-bold tracking-widest"
               >
                 Generálás
               </Button>
@@ -508,19 +508,22 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
       )}
 
       {/* ── Main layout ── */}
-      <div className="flex-1 max-w-5xl mx-auto w-full px-6 py-8 flex flex-col min-h-0">
+      <div className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-5 sm:py-8 flex flex-col min-h-0">
 
-        <header className="flex justify-between items-center mb-10 shrink-0">
+        <header className="flex justify-between items-center mb-6 sm:mb-10 shrink-0">
           <h1
-            className="text-2xl font-black tracking-tighter text-[#004685] uppercase cursor-pointer"
+            className="text-xl sm:text-2xl font-black tracking-tighter text-[#004685] uppercase cursor-pointer"
             onClick={() => setCurrentSection("main")}
           >
             SZE <span className="text-[#97c93e]">ssistant</span>
           </h1>
-          <div className="flex items-center space-x-6">
-            <span className="text-[10px] font-bold tracking-[0.3em] text-slate-800 uppercase">SZE-IVK Informatika tanszék</span>
-            <div className="relative" onMouseEnter={() => setShowMenu(true)} onMouseLeave={() => setShowMenu(false)}>
-              <button className="w-9 h-9 rounded-full bg-[#97c93e] flex items-center justify-center hover:opacity-90 transition-opacity relative">
+          <div className="flex items-center space-x-4 sm:space-x-6">
+            <span className="hidden sm:block text-[10px] font-bold tracking-[0.3em] text-slate-800 uppercase">SZE-IVK Informatika tanszék</span>
+            <div className="relative">
+              <button
+                onClick={() => setShowMenu(v => !v)}
+                className="w-9 h-9 rounded-full bg-[#97c93e] flex items-center justify-center hover:opacity-90 transition-opacity relative"
+              >
                 <User className="w-5 h-5 text-white" />
                 {totalUnread > 0 && (
                   <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#004685] text-white text-[9px] font-black flex items-center justify-center border-2 border-white">
@@ -529,26 +532,29 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
                 )}
               </button>
               {showMenu && (
-                <div className="absolute right-0 top-full w-48 bg-[#97c93e] shadow-lg z-50">
-                  <button onClick={() => { setCurrentSection("profile"); setShowMenu(false) }} className="w-full text-left px-4 py-3 text-white text-[11px] font-bold uppercase tracking-wider hover:bg-[#87b935] transition-colors">Profil</button>
-                  <button onClick={() => { setCurrentSection("files"); setShowMenu(false) }} className="w-full text-left px-4 py-3 text-white text-[11px] font-bold uppercase tracking-wider hover:bg-[#87b935] transition-colors">Fileok</button>
-                  <button
-                    onClick={() => { setCurrentSection("chat"); setShowMenu(false) }}
-                    className="w-full text-left px-4 py-3 text-white text-[11px] font-bold uppercase tracking-wider hover:bg-[#87b935] transition-colors flex items-center justify-between"
-                  >
-                    <span className="flex items-center gap-2">
-                      Csevegés
-                    </span>
-                    {totalUnread > 0 && (
-                      <span className="w-5 h-5 rounded-full bg-[#004685] text-white text-[9px] font-black flex items-center justify-center shrink-0">
-                        {totalUnread > 9 ? "9+" : totalUnread}
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+                  <div className="absolute right-0 top-full w-48 bg-[#97c93e] shadow-lg z-50">
+                    <button onClick={() => { setCurrentSection("profile"); setShowMenu(false) }} className="w-full text-left px-4 py-3 text-white text-[11px] font-bold uppercase tracking-wider hover:bg-[#87b935] transition-colors">Profil</button>
+                    <button onClick={() => { setCurrentSection("files"); setShowMenu(false) }} className="w-full text-left px-4 py-3 text-white text-[11px] font-bold uppercase tracking-wider hover:bg-[#87b935] transition-colors">Fileok</button>
+                    <button
+                      onClick={() => { setCurrentSection("chat"); setShowMenu(false) }}
+                      className="w-full text-left px-4 py-3 text-white text-[11px] font-bold uppercase tracking-wider hover:bg-[#87b935] transition-colors flex items-center justify-between"
+                    >
+                      <span className="flex items-center gap-2">
+                        Csevegés
                       </span>
-                    )}
-                  </button>
-                  <div className="border-t border-white/30">
-                    <button onClick={onLogout} className="w-full text-left px-4 py-3 text-white text-[11px] font-bold uppercase tracking-wider hover:bg-[#87b935] transition-colors">Kijelentkezés</button>
+                      {totalUnread > 0 && (
+                        <span className="w-5 h-5 rounded-full bg-[#004685] text-white text-[9px] font-black flex items-center justify-center shrink-0">
+                          {totalUnread > 9 ? "9+" : totalUnread}
+                        </span>
+                      )}
+                    </button>
+                    <div className="border-t border-white/30">
+                      <button onClick={onLogout} className="w-full text-left px-4 py-3 text-white text-[11px] font-bold uppercase tracking-wider hover:bg-[#87b935] transition-colors">Kijelentkezés</button>
+                    </div>
                   </div>
-                </div>
+                </>
               )}
             </div>
           </div>
@@ -561,14 +567,15 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
         )}
 
         <Tabs defaultValue="faq" className={`flex-1 flex flex-col min-h-0 ${currentSection !== "main" ? "hidden" : ""}`}>
-          <TabsList className="bg-transparent h-auto p-0 mb-8 border-b border-slate-100 w-full justify-start space-x-10 shrink-0">
-            {TABS.map(({ id, label }) => (
+          <TabsList className="bg-transparent h-auto p-0 mb-6 sm:mb-8 border-b border-slate-100 w-full justify-start gap-5 sm:gap-10 shrink-0 overflow-x-auto">
+            {TABS.map(({ id, label, short }) => (
               <TabsTrigger
                 key={id}
                 value={id}
-                className="rounded-none px-0 py-3 text-[11px] font-bold uppercase tracking-widest data-[state=active]:border-b-2 data-[state=active]:border-[#004685] data-[state=active]:text-[#004685] bg-transparent shadow-none transition-all opacity-50 data-[state=active]:opacity-100"
+                className="rounded-none px-0 py-3 text-[11px] font-bold uppercase tracking-widest data-[state=active]:border-b-2 data-[state=active]:border-[#004685] data-[state=active]:text-[#004685] bg-transparent shadow-none transition-all opacity-50 data-[state=active]:opacity-100 shrink-0 whitespace-nowrap"
               >
-                {label}
+                <span className="hidden sm:block">{label}</span>
+                <span className="sm:hidden">{short}</span>
               </TabsTrigger>
             ))}
           </TabsList>
@@ -596,7 +603,7 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
                   )}
                 </div>
                 {results.faq ? (
-                  <div className="flex-1 bg-white p-8 overflow-y-auto border-2 border-slate-100 shadow-inner prose prose-slate max-w-none prose-p:text-sm">
+                  <div className="flex-1 bg-white p-4 sm:p-8 overflow-y-auto border-2 border-slate-100 shadow-inner prose prose-slate max-w-none prose-p:text-sm">
                     <ReactMarkdown>{results.faq}</ReactMarkdown>
                   </div>
                 ) : (
@@ -610,7 +617,7 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
                 <Button
                   onClick={() => handleAiCall("faq")}
                   disabled={loading === "faq" || !inputs.faq}
-                  className="mt-4 self-end bg-[#004685] hover:bg-[#97c93e] text-white rounded-none px-12 py-7 font-bold uppercase tracking-widest text-[10px] shadow-lg"
+                  className="mt-4 self-end bg-[#004685] hover:bg-[#97c93e] text-white rounded-none px-8 sm:px-12 py-5 sm:py-7 font-bold uppercase tracking-widest text-[10px] shadow-lg"
                 >
                   {loading === "faq" ? <Loader2 className="animate-spin" /> : "Feldolgozás"}
                 </Button>
@@ -622,7 +629,7 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
               <div className="w-full max-w-2xl space-y-6 text-center">
                 <h3 className="text-lg font-bold text-[#004685] uppercase tracking-tighter">Oktatói Reflexió</h3>
                 {results.wellbeing ? (
-                  <div className="p-8 bg-white border-2 border-[#97c93e]/30 shadow-sm prose prose-slate italic font-light">
+                  <div className="p-4 sm:p-8 bg-white border-2 border-[#97c93e]/30 shadow-sm prose prose-slate italic font-light">
                     <ReactMarkdown>{results.wellbeing}</ReactMarkdown>
                     <div className="flex justify-center gap-3 mt-6">
                       <Button
@@ -648,7 +655,7 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
                     <Button
                       onClick={() => handleAiCall("wellbeing")}
                       disabled={loading === "wellbeing" || !inputs.wellbeing}
-                      className="bg-[#97c93e] hover:bg-[#004685] text-white rounded-none px-16 py-7 font-bold uppercase tracking-widest text-[10px] shadow-lg"
+                      className="bg-[#97c93e] hover:bg-[#004685] text-white rounded-none px-10 sm:px-16 py-5 sm:py-7 font-bold uppercase tracking-widest text-[10px] shadow-lg"
                     >
                       {loading === "wellbeing" ? <Loader2 className="animate-spin" /> : "Állapot elemzése"}
                     </Button>
@@ -661,7 +668,7 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
             <TabsContent value="notes" className="h-full m-0 outline-none">
               <div className="h-full border-2 border-dashed border-slate-200 bg-white flex flex-col items-center justify-center relative overflow-hidden group hover:border-[#97c93e] transition-all">
                 {results.notes ? (
-                  <div className="w-full h-full p-8 overflow-y-auto prose prose-slate max-w-none prose-headings:text-[#004685]">
+                  <div className="w-full h-full p-4 sm:p-8 overflow-y-auto prose prose-slate max-w-none prose-headings:text-[#004685]">
                     <div className="flex justify-between items-center mb-6">
                       <span className="text-[10px] font-bold uppercase text-slate-400">Generált jegyzet</span>
                       <div className="flex gap-2">
@@ -772,7 +779,7 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
                       </Button>
                     </div>
                   </div>
-                  <div className="flex-1 bg-white p-8 overflow-y-auto border-2 border-slate-100 shadow-inner prose prose-slate max-w-none prose-headings:text-[#004685] prose-p:text-sm">
+                  <div className="flex-1 bg-white p-4 sm:p-8 overflow-y-auto border-2 border-slate-100 shadow-inner prose prose-slate max-w-none prose-headings:text-[#004685] prose-p:text-sm">
                     <ReactMarkdown>{testResult.test}</ReactMarkdown>
                   </div>
                 </div>
@@ -820,9 +827,9 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
                     <Button
                       onClick={() => setShowTestModal(true)}
                       disabled={!testPdfs.length || loading === "test"}
-                      className="bg-[#004685] hover:bg-[#97c93e] text-white rounded-none px-12 py-7 font-bold uppercase tracking-widest text-[10px] shadow-lg"
+                      className="bg-[#004685] hover:bg-[#97c93e] text-white rounded-none px-8 sm:px-12 py-5 sm:py-7 font-bold uppercase tracking-widest text-[10px] shadow-lg"
                     >
-                      {loading === "test" ? <Loader2 className="animate-spin" /> : "Teszt generálása →"}
+                      {loading === "test" ? <Loader2 className="animate-spin" /> : "Teszt generálása"}
                     </Button>
                   </div>
                 </div>
@@ -832,7 +839,7 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
           </div>
         </Tabs>
 
-        <footer className={`mt-8 pt-6 border-t border-slate-50 flex justify-between items-center shrink-0 ${currentSection !== "main" ? "hidden" : ""}`}>
+        <footer className={`mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-slate-50 flex justify-between items-center shrink-0 ${currentSection !== "main" ? "hidden" : ""}`}>
           <p className="text-[8px] font-bold uppercase tracking-[0.5em] text-slate-800">SZE-IVK-IT-2026</p>
           <p className="text-[9px] text-slate-800 font-medium italic">it.sze.hu/assistant</p>
         </footer>

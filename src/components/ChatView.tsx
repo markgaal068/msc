@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Loader2, Search, Star, Paperclip, Send, Check, CheckCheck, X, FileText, ImageIcon } from "lucide-react"
+import { Loader2, Search, Star, Paperclip, Send, Check, CheckCheck, X, FileText, ImageIcon, ArrowLeft } from "lucide-react"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -289,7 +289,7 @@ export default function ChatView({ user, onUnreadChange }: ChatViewProps) {
     <div className="flex-1 flex min-h-0 border border-slate-100 bg-white overflow-hidden">
 
       {/* ── Left panel ─────────────────────────────────────────────────────── */}
-      <div className="w-72 shrink-0 flex flex-col border-r border-slate-100 min-h-0">
+      <div className={`${selectedConv ? 'hidden md:flex' : 'flex'} w-full md:w-72 md:shrink-0 flex-col border-r border-slate-100 min-h-0`}>
 
         {/* Search */}
         <div className="p-3 border-b border-slate-100 shrink-0">
@@ -368,7 +368,7 @@ export default function ChatView({ user, onUnreadChange }: ChatViewProps) {
       </div>
 
       {/* ── Right panel ─────────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-h-0">
+      <div className={`${!selectedConv ? 'hidden md:flex' : 'flex'} flex-1 flex-col min-h-0`}>
         {!selectedConv ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center gap-3">
             <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center">
@@ -381,8 +381,14 @@ export default function ChatView({ user, onUnreadChange }: ChatViewProps) {
         ) : (
           <>
             {/* Conversation header */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0 bg-white">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between px-3 sm:px-5 py-3 border-b border-slate-100 shrink-0 bg-white">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <button
+                  onClick={() => setSelectedConv(null)}
+                  className="md:hidden p-1.5 -ml-1 text-slate-400 hover:text-[#004685] transition-colors shrink-0"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
                 <Avatar name={selectedConv.otherUser.name} avatar={selectedConv.otherUser.avatar} size="lg" />
                 <div>
                   <p className="text-sm font-bold text-[#004685]">{selectedConv.otherUser.name}</p>
@@ -416,7 +422,7 @@ export default function ChatView({ user, onUnreadChange }: ChatViewProps) {
                       )}
                     </div>
 
-                    <div className={`max-w-[65%] ${isMe ? "items-end" : "items-start"} flex flex-col gap-0.5`}>
+                    <div className={`max-w-[80%] sm:max-w-[65%] ${isMe ? "items-end" : "items-start"} flex flex-col gap-0.5`}>
                       {/* File attachment */}
                       {msg.fileData && (
                         <div className={`rounded-none border p-2.5 ${isMe ? "bg-[#004685]/10 border-[#004685]/20" : "bg-white border-slate-200"}`}>

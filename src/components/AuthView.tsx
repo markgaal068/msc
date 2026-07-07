@@ -133,7 +133,7 @@ export default function AuthView({ onAuthSuccess }: AuthViewProps) {
         </div>
       )}
 
-      <div className="w-full max-w-md bg-white border border-slate-100 p-8 shadow-xl relative z-10 transition-all duration-300">
+      <div className="w-full max-w-md bg-white border border-slate-100 p-6 sm:p-8 shadow-xl relative z-10 transition-all duration-300">
         <header className="text-center mb-8">
           <h1 className="text-2xl font-black tracking-tighter text-[#004685] uppercase">
             <span className="text-[#004685]">SZE</span><span className="text-[#97c93e]">SSISTANT</span>
