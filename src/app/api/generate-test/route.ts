@@ -13,8 +13,8 @@ const DIFFICULTY_LABELS: Record<string, string> = {
 const TASK_TYPE_LABELS: Record<string, string> = {
   essay: "Esszé kérdések (részletes kifejtést igénylő, min. fél oldalas válasz)",
   short: "Rövid kifejtős kérdések (2-5 mondatos válasz)",
-  multiple: "Többválasztós kérdések (4 lehetséges válasz, 1 VAGY TÖBB helyes is lehetséges — a tananyag alapján döntsd el; minden kérdésnél jelöld meg, hány helyes válasz van)",
-  truefalse: "Igaz/Hamis állítások (indoklással)",
+  multiple: "Többválasztós kérdések (4 lehetséges válasz, A–D jelöléssel; 1 VAGY TÖBB helyes is lehetséges a tananyag alapján — NE tüntesd fel a kérdésnél, hány helyes válasz van)",
+  truefalse: "Igaz/Hamis állítások (CSAK az állítás szövege, NE kérj indoklást a hallgatótól)",
 };
 
 export async function POST(req: Request) {
@@ -114,10 +114,11 @@ FELADAT: Generálj egy tesztet a következő beállításokkal:
 - Feladattípusok és kérdésszámok:
 ${selectedTypes}
 ${includeScoring && includeMaxScore
-  ? `- Az összes feladatra összesen pontosan ${maxScore} pontot ossz el arányosan a feladatok nehézsége és típusa szerint. Minden feladatnál tüntesd fel az adott pontszámot zárójelben. A teszt tetején tüntesd fel: "Összpontszám: ${maxScore} pont".`
+  ? `- Az összes feladatra összesen pontosan ${maxScore} pontot ossz el arányosan a feladatok nehézsége és típusa szerint. A teszt tetején tüntesd fel: "Összpontszám: ${maxScore} pont".`
   : includeScoring
-  ? "- Adj pontozást minden feladathoz (pl. 2 pont, 5 pont stb.)"
+  ? "- Adj pontozást minden feladathoz."
   : ""}
+${includeScoring ? `- PONTOZÁS ELHELYEZÉSE (KÖTELEZŐ): A pontszámot KÖZVETLENÜL a kérdés szövege után, a válaszlehetőségek ELŐTT tüntesd fel félkövéren, pl.: "1. Kérdés szövege? **(2 pont)**". NE az utolsó válaszlehetőség után szerepeljen!` : ""}
 
 Formázás: Markdown, feladattípusonként külön szekcióban (## fejléccel). A teszt tetején tüntesd fel a fájl nevét: "${testFileName}".${giftInstructions}`;
 
@@ -152,12 +153,18 @@ Formázás: Markdown, feladattípusonként külön szekcióban (## fejléccel). 
         messages: [
           {
             role: "system",
-            content: `Te egy pontosan dolgozó megoldókulcs-készítő asszisztens vagy.
-SZIGORÚ SZABÁLYOK:
+            content: `Te egy részletes megoldókulcsot készítő asszisztens vagy.
+SZABÁLYOK:
 1. A válaszok KIZÁRÓLAG a megadott tananyagon alapulhatnak.
-2. Minden kérdésnél add meg a helyes választ és egy rövid magyarázatot, hogy hol található a válasz a forrásban.
+2. Minden kérdésnél add meg:
+   - A helyes válasz(ok)at egyértelműen kiemelve (félkövéren)
+   - Többválasztósoknál: jelöld meg melyik betű(k) helyes(ek) és hány helyes válasz volt összesen
+   - Igaz/Hamis kérdéseknél: a helyes megoldás (Igaz/Hamis) + rövid indoklás a tananyag alapján
+   - Rövid magyarázatot, hogy miért helyes és hol található a forrásban
+   - Ha a tesztben pontozás szerepelt: tüntesd fel az adott kérdés pontszámát
+   - ESSZÉ és RÖVID KIFEJTŐS kérdéseknél KÖTELEZŐ részpontozási séma: részletezd, hogy a teljes pontszám hogyan osztható fel szempontok szerint (pl. "1 pont: a fogalom helyes meghatározása — 1 pont: az összefüggés kifejtése — 1 pont: konkrét példa vagy hivatkozás"). Ha nincs megadott pontszám, akkor is adj javasolt részpontozást.
 3. Ne találj ki semmit, ami nincs a tananyagban.
-Formázás: Markdown, ugyanolyan számozással mint a teszt.`,
+Formázás: Markdown, ugyanolyan fejlécekkel és számozással mint a teszt. Minden kérdésnél a helyes megoldást jól elkülönítve, jól olvashatóan add meg.`,
           },
           {
             role: "user",

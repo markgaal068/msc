@@ -57,44 +57,51 @@ const TABS = [
   { id: "test",      label: "Teszt Generátor",   short: "Teszt" },
 ]
 
-// ── Markdown → docx ──────────────────────────────────────────────────────────
-async function downloadAsDocx(content: string, filename: string) {
-  const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import("docx")
-  type TR = InstanceType<typeof TextRun>
-
-  const parseInline = (text: string): TR[] => {
-    const runs: TR[] = []
+// ── Shared docx helpers ───────────────────────────────────────────────────────
+function buildInlineParser(TextRun: typeof import("docx").TextRun): (text: string) => InstanceType<typeof import("docx").TextRun>[] {
+  const run = (text: string, opts: object = {}) =>
+    new TextRun({ text, color: "000000", ...opts }) as InstanceType<typeof import("docx").TextRun>
+  return (text: string) => {
     const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g)
-    for (const part of parts) {
-      if (!part) continue
-      if (part.startsWith("**") && part.endsWith("**"))
-        runs.push(new TextRun({ text: part.slice(2, -2), bold: true }))
-      else if (part.startsWith("*") && part.endsWith("*"))
-        runs.push(new TextRun({ text: part.slice(1, -1), italics: true }))
-      else
-        runs.push(new TextRun({ text: part }))
-    }
-    return runs.length ? runs : [new TextRun({ text })]
+    const runs = parts.flatMap(part => {
+      if (!part) return []
+      if (part.startsWith("**") && part.endsWith("**")) return [run(part.slice(2, -2), { bold: true })]
+      if (part.startsWith("*") && part.endsWith("*"))   return [run(part.slice(1, -1), { italics: true })]
+      return [run(part)]
+    })
+    return runs.length ? runs : [run(text)]
   }
+}
 
-  const children: InstanceType<typeof Paragraph>[] = []
-  for (const rawLine of content.split("\n")) {
+function buildBodyParagraphs(
+  lines: string[],
+  Paragraph: typeof import("docx").Paragraph,
+  HeadingLevel: typeof import("docx").HeadingLevel,
+  parseInline: (t: string) => InstanceType<typeof import("docx").TextRun>[],
+): InstanceType<typeof import("docx").Paragraph>[] {
+  return lines.map(rawLine => {
     const line = rawLine.trimEnd()
-    if (line.startsWith("### "))
-      children.push(new Paragraph({ heading: HeadingLevel.HEADING_3, children: parseInline(line.slice(4)) }))
-    else if (line.startsWith("## "))
-      children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: parseInline(line.slice(3)) }))
-    else if (line.startsWith("# "))
-      children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, children: parseInline(line.slice(2)) }))
-    else if (/^[-*] /.test(line))
-      children.push(new Paragraph({ bullet: { level: 0 }, children: parseInline(line.slice(2)) }))
-    else if (line.trim() === "")
-      children.push(new Paragraph({ text: "" }))
-    else
-      children.push(new Paragraph({ children: parseInline(line) }))
-  }
+    if (line.startsWith("### ")) return new Paragraph({ heading: HeadingLevel.HEADING_3, children: parseInline(line.slice(4)), spacing: { before: 280, after: 120 } })
+    if (line.startsWith("## "))  return new Paragraph({ heading: HeadingLevel.HEADING_2, children: parseInline(line.slice(3)), spacing: { before: 360, after: 160 } })
+    if (line.startsWith("# "))   return new Paragraph({ heading: HeadingLevel.HEADING_1, children: parseInline(line.slice(2)), spacing: { before: 440, after: 200 } })
+    if (/^[-*] /.test(line))     return new Paragraph({ bullet: { level: 0 }, children: parseInline(line.slice(2)), spacing: { after: 120 } })
+    if (line.trim() === "")      return new Paragraph({ spacing: { before: 0, after: 80 } })
+    return new Paragraph({ children: parseInline(line), spacing: { after: 140 } })
+  })
+}
 
-  const doc = new Document({ sections: [{ properties: {}, children }] })
+function skipFirstHeading(content: string): string[] {
+  const lines = content.split("\n")
+  let start = 0
+  if (lines[0]?.startsWith("# ")) {
+    start = 1
+    while (start < lines.length && lines[start].trim() === "") start++
+  }
+  return lines.slice(start)
+}
+
+async function saveDocx(doc: InstanceType<typeof import("docx").Document>, filename: string) {
+  const { Packer } = await import("docx")
   const blob = await Packer.toBlob(doc)
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
@@ -102,6 +109,93 @@ async function downloadAsDocx(content: string, filename: string) {
   a.download = `${filename}.docx`
   a.click()
   URL.revokeObjectURL(url)
+}
+
+// ── Test docx: professional exam sheet with student info header ───────────────
+async function downloadTestAsDocx(content: string, filename: string) {
+  const {
+    Document, Packer: _P, Paragraph, TextRun, HeadingLevel,
+    Table, TableRow, TableCell, BorderStyle, WidthType, AlignmentType,
+  } = await import("docx")
+
+  const parseInline = buildInlineParser(TextRun)
+  const run = (text: string, opts: object = {}) => new TextRun({ text, color: "000000", ...opts })
+
+  const noB   = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" }
+  const lineB = { style: BorderStyle.SINGLE, size: 6, color: "000000" }
+  const noAll = { top: noB, bottom: noB, left: noB, right: noB, insideH: noB, insideV: noB }
+  const fieldB = { top: noB, bottom: lineB, left: noB, right: noB }
+
+  const mkField = (label: string, colSpan?: number) =>
+    new TableCell({
+      columnSpan: colSpan,
+      borders: fieldB,
+      children: [new Paragraph({ spacing: { before: 120, after: 300 }, children: [run(label, { bold: true, size: 20 })] })],
+    })
+
+  const mkGap = () =>
+    new TableCell({
+      width: { size: 400, type: WidthType.DXA },
+      borders: noAll,
+      children: [new Paragraph({ text: "" })],
+    })
+
+  const mkSpacerRow = () =>
+    new TableRow({
+      children: [new TableCell({ columnSpan: 3, borders: noAll, children: [new Paragraph({ spacing: { before: 60, after: 60 } })] })],
+    })
+
+  const infoTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: noAll,
+    rows: [
+      new TableRow({ children: [mkField("Hallgató neve:"), mkGap(), mkField("Neptun-kód:")] }),
+      mkSpacerRow(),
+      new TableRow({ children: [mkField("Dátum:"), mkGap(), mkField("Csoport / Évfolyam:")] }),
+      mkSpacerRow(),
+      new TableRow({ children: [mkField("Pontszám: _______ / _______ pont"), mkGap(), mkField("Érdemjegy:")] }),
+      mkSpacerRow(),
+      new TableRow({ children: [new TableCell({ columnSpan: 3, borders: fieldB, children: [new Paragraph({ spacing: { before: 120, after: 300 }, children: [run("Aláírás:", { bold: true, size: 20 })] })] })] }),
+    ],
+  })
+
+  const body = buildBodyParagraphs(skipFirstHeading(content), Paragraph, HeadingLevel, parseInline)
+
+  const doc = new Document({
+    sections: [{
+      children: [
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 400 }, children: [run(filename, { bold: true, size: 36 })] }),
+        infoTable,
+        new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: "000000", space: 1 } }, spacing: { before: 480, after: 480 } }),
+        ...body,
+      ],
+    }],
+  })
+
+  await saveDocx(doc, filename)
+}
+
+// ── Answer key docx: detailed scoring layout ──────────────────────────────────
+async function downloadAnswerKeyAsDocx(content: string, filename: string) {
+  const { Document, Paragraph, TextRun, HeadingLevel, BorderStyle, AlignmentType } = await import("docx")
+
+  const parseInline = buildInlineParser(TextRun)
+  const run = (text: string, opts: object = {}) => new TextRun({ text, color: "000000", ...opts })
+
+  const body = buildBodyParagraphs(skipFirstHeading(content), Paragraph, HeadingLevel, parseInline)
+
+  const doc = new Document({
+    sections: [{
+      children: [
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 100 }, children: [run("MEGOLDÓKULCS", { bold: true, size: 40 })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: [run(filename, { size: 22, italics: true })] }),
+        new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: "000000", space: 1 } }, spacing: { before: 320, after: 480 } }),
+        ...body,
+      ],
+    }],
+  })
+
+  await saveDocx(doc, filename)
 }
 
 function downloadAsText(content: string, filename: string) {
@@ -772,7 +866,7 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
                       <Button
                         variant="outline"
                         className="h-7 text-[9px] uppercase rounded-none gap-1.5"
-                        onClick={() => downloadAsDocx(testResult.test, testSettings.testFileName)}
+                        onClick={() => downloadTestAsDocx(testResult.test, testSettings.testFileName)}
                       >
                         <Download className="w-3 h-3" /> Vizsgasor (.docx)
                       </Button>
@@ -780,7 +874,7 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
                         <Button
                           variant="outline"
                           className="h-7 text-[9px] uppercase rounded-none gap-1.5 border-[#97c93e] text-[#97c93e] hover:bg-[#97c93e]/5"
-                          onClick={() => downloadAsDocx(testResult.answerKey!, testSettings.answerKeyFileName)}
+                          onClick={() => downloadAnswerKeyAsDocx(testResult.answerKey!, testSettings.answerKeyFileName)}
                         >
                           <Download className="w-3 h-3" /> Megoldókulcs (.docx)
                         </Button>
