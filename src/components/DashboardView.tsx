@@ -25,6 +25,8 @@ interface TestSettings {
   taskTypes: string[]
   questionCounts: Record<string, number>
   includeScoring: boolean
+  includeMaxScore: boolean
+  maxScore: number
   includeAnswerKey: boolean
   answerKeyFileName: string
   includeGift: boolean
@@ -130,6 +132,8 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
     taskTypes:         ["multiple", "truefalse"],
     questionCounts:    { ...DEFAULT_COUNTS },
     includeScoring:    true,
+    includeMaxScore:   false,
+    maxScore:          100,
     includeAnswerKey:  false,
     answerKeyFileName: "megoldokulcs",
     includeGift:       false,
@@ -419,15 +423,51 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
               </div>
 
               {/* Scoring */}
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={testSettings.includeScoring}
-                  onChange={e => setTestSettings(prev => ({ ...prev, includeScoring: e.target.checked }))}
-                  className="accent-[#004685] w-4 h-4"
-                />
-                <span className="text-[11px] font-bold uppercase tracking-wider">Pontozás megadása</span>
-              </label>
+              <div className="space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={testSettings.includeScoring}
+                    onChange={e => setTestSettings(prev => ({
+                      ...prev,
+                      includeScoring: e.target.checked,
+                      includeMaxScore: e.target.checked ? prev.includeMaxScore : false,
+                    }))}
+                    className="accent-[#004685] w-4 h-4"
+                  />
+                  <span className="text-[11px] font-bold uppercase tracking-wider">Pontozás megadása</span>
+                </label>
+
+                {testSettings.includeScoring && (
+                  <div className="ml-7 space-y-3">
+                    <label className={`flex items-center gap-3 cursor-pointer`}>
+                      <input
+                        type="checkbox"
+                        checked={testSettings.includeMaxScore}
+                        onChange={e => setTestSettings(prev => ({ ...prev, includeMaxScore: e.target.checked }))}
+                        className="accent-[#004685] w-4 h-4"
+                      />
+                      <span className="text-[11px] font-medium uppercase tracking-wider">Maximális pontszám megadása</span>
+                    </label>
+                    {testSettings.includeMaxScore && (
+                      <div className="ml-7">
+                        <label className="text-[9px] font-bold uppercase tracking-[0.25em] text-slate-400 block mb-2">Összpontszám</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min={1}
+                            max={1000}
+                            value={testSettings.maxScore}
+                            onChange={e => setTestSettings(prev => ({ ...prev, maxScore: Math.max(1, parseInt(e.target.value) || 1) }))}
+                            className="w-24 border border-slate-200 px-3 py-2 text-sm font-light focus:outline-none focus:border-[#004685] rounded-none"
+                          />
+                          <span className="text-[11px] text-slate-400 font-medium">pont</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {/* Answer key */}
               <div className="space-y-3">

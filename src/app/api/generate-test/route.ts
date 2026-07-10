@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     }
 
     const settings = JSON.parse(settingsRaw);
-    const { testFileName, difficulty, taskTypes, questionCounts, includeScoring, includeAnswerKey, includeGift } = settings;
+    const { testFileName, difficulty, taskTypes, questionCounts, includeScoring, includeMaxScore, maxScore, includeAnswerKey, includeGift } = settings;
     const giftEligible = !!includeGift && (taskTypes as string[]).every((t: string) => t === "truefalse" || t === "multiple");
 
     // Extract text from all PDFs
@@ -113,7 +113,11 @@ FELADAT: Generálj egy tesztet a következő beállításokkal:
 - Nehézség: ${DIFFICULTY_LABELS[difficulty] || difficulty}
 - Feladattípusok és kérdésszámok:
 ${selectedTypes}
-${includeScoring ? "- Adj pontozást minden feladathoz (pl. 2 pont, 5 pont stb.)" : ""}
+${includeScoring && includeMaxScore
+  ? `- Az összes feladatra összesen pontosan ${maxScore} pontot ossz el arányosan a feladatok nehézsége és típusa szerint. Minden feladatnál tüntesd fel az adott pontszámot zárójelben. A teszt tetején tüntesd fel: "Összpontszám: ${maxScore} pont".`
+  : includeScoring
+  ? "- Adj pontozást minden feladathoz (pl. 2 pont, 5 pont stb.)"
+  : ""}
 
 Formázás: Markdown, feladattípusonként külön szekcióban (## fejléccel). A teszt tetején tüntesd fel a fájl nevét: "${testFileName}".${giftInstructions}`;
 
