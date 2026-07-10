@@ -3,13 +3,12 @@
 import { useState, useEffect, useRef } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Camera, Lock, Mail, CheckCircle2, AlertCircle, Loader2 } from "lucide-react"
+import { Camera, Lock, Mail, Loader2 } from "lucide-react"
+import { toast } from "react-toastify"
 
 interface ProfileViewProps {
   user: { email: string; name: string }
 }
-
-type Feedback = { section: string; type: "success" | "error"; text: string }
 
 export default function ProfileView({ user }: ProfileViewProps) {
   const [avatar, setAvatar] = useState<string | null>(null)
@@ -22,8 +21,6 @@ export default function ProfileView({ user }: ProfileViewProps) {
   const [secEmailEnabled, setSecEmailEnabled] = useState(false)
   const [secLoading, setSecLoading] = useState(false)
 
-  const [feedback, setFeedback] = useState<Feedback | null>(null)
-
   useEffect(() => {
     fetch(`/api/profile?email=${encodeURIComponent(user.email)}`)
       .then(r => r.json())
@@ -34,16 +31,11 @@ export default function ProfileView({ user }: ProfileViewProps) {
       })
   }, [user.email])
 
-  const showFeedback = (section: string, type: "success" | "error", text: string) => {
-    setFeedback({ section, type, text })
-    setTimeout(() => setFeedback(null), 4000)
-  }
-
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     if (file.size > 500 * 1024) {
-      showFeedback("avatar", "error", "A kép mérete maximum 500KB lehet.")
+      toast.error("A kép mérete maximum 500KB lehet!", { style: { borderRadius: 0 } })
       return
     }
     const reader = new FileReader()
@@ -56,7 +48,8 @@ export default function ProfileView({ user }: ProfileViewProps) {
         body: JSON.stringify({ email: user.email, action: "avatar", avatar: base64 }),
       })
       const data = await res.json()
-      if (!res.ok) showFeedback("avatar", "error", data.error || "Hiba történt.")
+      if (!res.ok) toast.error(data.error || "Profilkép feltöltése sikertelen.", { style: { borderRadius: 0 } })
+      else toast.success("Profilkép sikeresen frissítve!", { style: { borderRadius: 0 } })
     }
     reader.readAsDataURL(file)
   }
@@ -64,7 +57,7 @@ export default function ProfileView({ user }: ProfileViewProps) {
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault()
     if (passwords.new !== passwords.confirm) {
-      showFeedback("password", "error", "A két jelszó nem egyezik!")
+      toast.error("A két jelszó nem egyezik!", { style: { borderRadius: 0 } })
       return
     }
     setPwLoading(true)
@@ -76,10 +69,10 @@ export default function ProfileView({ user }: ProfileViewProps) {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Hiba történt.")
-      showFeedback("password", "success", "Jelszó sikeresen megváltoztatva!")
+      toast.success("Jelszó sikeresen megváltoztatva!", { style: { borderRadius: 0 } })
       setPasswords({ current: "", new: "", confirm: "" })
     } catch (err: any) {
-      showFeedback("password", "error", err.message)
+      toast.error(err.message || "Jelszó módosítása sikertelen.", { style: { borderRadius: 0 } })
     } finally {
       setPwLoading(false)
     }
@@ -96,24 +89,12 @@ export default function ProfileView({ user }: ProfileViewProps) {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Hiba történt.")
-      showFeedback("secEmail", "success", "Biztonsági e-mail beállítások mentve!")
+      toast.success("Biztonsági e-mail beállítások mentve!", { style: { borderRadius: 0 } })
     } catch (err: any) {
-      showFeedback("secEmail", "error", err.message)
+      toast.error(err.message || "Beállítások mentése sikertelen.", { style: { borderRadius: 0 } })
     } finally {
       setSecLoading(false)
     }
-  }
-
-  const FeedbackBox = ({ section }: { section: string }) => {
-    if (feedback?.section !== section) return null
-    return (
-      <div className={`flex items-center space-x-2 p-3 text-xs ${feedback.type === "success" ? "bg-emerald-50 border border-emerald-100 text-emerald-700" : "bg-red-50 border border-red-100 text-red-600"}`}>
-        {feedback.type === "success"
-          ? <CheckCircle2 className="w-4 h-4 shrink-0" />
-          : <AlertCircle className="w-4 h-4 shrink-0" />}
-        <span>{feedback.text}</span>
-      </div>
-    )
   }
 
   const initials = user.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2)
@@ -140,7 +121,6 @@ export default function ProfileView({ user }: ProfileViewProps) {
             </div>
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
           </div>
-          <FeedbackBox section="avatar" />
           <div className="text-center">
             <p className="font-black text-[#004685] text-sm uppercase tracking-wider">{user.name}</p>
             <p className="text-[11px] text-slate-400 mt-1">{user.email}</p>
@@ -176,7 +156,6 @@ export default function ProfileView({ user }: ProfileViewProps) {
               onChange={e => setPasswords(p => ({ ...p, confirm: e.target.value }))}
               className="border-slate-200 rounded-none h-10 focus-visible:ring-0 focus-visible:border-[#004685] text-sm"
             />
-            <FeedbackBox section="password" />
             <div className="flex justify-end pt-1">
               <Button
                 type="submit"
@@ -217,7 +196,6 @@ export default function ProfileView({ user }: ProfileViewProps) {
                 <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${secEmailEnabled ? "translate-x-5" : "translate-x-0"}`} />
               </button>
             </div>
-            <FeedbackBox section="secEmail" />
             <div className="flex justify-end pt-1">
               <Button
                 type="submit"

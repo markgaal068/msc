@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2, Upload, User, FileText, X, Download, Save, CheckCircle2, MessageSquare } from "lucide-react"
+import { Loader2, Upload, User, FileText, X, Download, Save } from "lucide-react"
+import { toast } from "react-toastify"
 import ReactMarkdown from 'react-markdown'
 import ProfileView from "@/components/ProfileView"
 import FilesView from "@/components/FilesView"
@@ -139,7 +140,6 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
   // Save state
   const [saveModal, setSaveModal]   = useState<SaveModal | null>(null)
   const [saveLoading, setSaveLoading] = useState(false)
-  const [savedToast, setSavedToast]   = useState(false)
 
   // Chat unread badge
   const [totalUnread, setTotalUnread] = useState(0)
@@ -282,10 +282,11 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
           content:   saveModal.content,
         }),
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) throw new Error("Mentés sikertelen.")
       setSaveModal(null)
-      setSavedToast(true)
-      setTimeout(() => setSavedToast(false), 3000)
+      toast.success("Fájl sikeresen mentve!", { style: { borderRadius: 0 } })
+    } catch (err: any) {
+      toast.error(err.message || "Hiba a mentés során!", { style: { borderRadius: 0 } })
     } finally {
       setSaveLoading(false)
     }
@@ -296,14 +297,6 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
   return (
     <main className="h-screen w-full bg-[#fcfcfc] text-[#1a1a1a] antialiased flex flex-col overflow-hidden font-sans">
       <div className="h-1 w-full bg-[#97c93e] shrink-0" />
-
-      {/* ── Save Toast ── */}
-      {savedToast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#004685] text-white px-4 py-3 shadow-lg text-[11px] font-bold uppercase tracking-wider animate-in slide-in-from-bottom-2">
-          <CheckCircle2 className="w-4 h-4 text-[#97c93e]" />
-          Fájl sikeresen mentve!
-        </div>
-      )}
 
       {/* ── Save Modal ── */}
       {saveModal && (
