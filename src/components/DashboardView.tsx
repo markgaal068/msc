@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { upload } from "@vercel/blob/client"
+import { uploadPresigned } from "@vercel/blob/client"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
@@ -351,7 +351,7 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
       // request body limitjébe (413 Payload Too Large).
       const uploaded = await Promise.all(
         testPdfs.map(async f => {
-          const blob = await upload(f.name, f, {
+          const blob = await uploadPresigned(f.name, f, {
             access: "private",
             handleUploadUrl: "/api/blob-upload",
           })

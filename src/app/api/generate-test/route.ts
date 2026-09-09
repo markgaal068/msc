@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     const giftEligible = !!includeGift && (taskTypes as string[]).every((t: string) => t === "truefalse" || t === "multiple");
 
     // Extract text from all PDFs (letöltve a privát Blob store-ból, a szerver
-    // BLOB_READ_WRITE_TOKEN-jével hitelesítve)
+    // Vercel OIDC hitelesítésével — BLOB_STORE_ID + VERCEL_OIDC_TOKEN)
     const pdfTexts: string[] = [];
     for (const file of files) {
       const result = await get(file.url, { access: "private" });

@@ -1,24 +1,37 @@
 import { NextResponse } from "next/server";
-import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
+import { issueSignedToken } from "@vercel/blob";
+import { handleUploadPresigned, type HandleUploadPresignedBody } from "@vercel/blob/client";
 
-// Autorizálja a kliens oldali közvetlen feltöltést a Vercel Blob-ba.
+// Autorizálja a kliens oldali közvetlen feltöltést a Vercel Blob-ba, a Vercel
+// OIDC-alapú (BLOB_STORE_ID + VERCEL_OIDC_TOKEN) hitelesítésével — ez a projekthez
+// natívan kapcsolt Blob store módja, nincs statikus BLOB_READ_WRITE_TOKEN.
 // Ez lehetővé teszi, hogy nagy PDF fájlok elkerüljék a Serverless Function
 // ~4.5MB-os request body limitjét (413 Payload Too Large éles környezetben).
 export async function POST(req: Request) {
-  console.log("[blob-upload] hasToken:", !!process.env.BLOB_READ_WRITE_TOKEN);
+  console.log(
+    "[blob-upload] hasStoreId:", !!process.env.BLOB_STORE_ID,
+    "hasOidcToken:", !!process.env.VERCEL_OIDC_TOKEN
+  );
 
   try {
-    const body = (await req.json()) as HandleUploadBody;
+    const body = (await req.json()) as HandleUploadPresignedBody;
 
-    const jsonResponse = await handleUpload({
+    const jsonResponse = await handleUploadPresigned({
       body,
       request: req,
-      onBeforeGenerateToken: async () => {
-        return {
+      getSignedToken: async (pathname) => {
+        const token = await issueSignedToken({
+          pathname,
+          operations: ["put"],
           allowedContentTypes: ["application/pdf"],
-          addRandomSuffix: true,
           maximumSizeInBytes: 25 * 1024 * 1024, // 25MB / fájl
-          tokenPayload: JSON.stringify({}),
+        });
+        return {
+          token,
+          urlOptions: {
+            addRandomSuffix: true,
+            tokenPayload: JSON.stringify({}),
+          },
         };
       },
       onUploadCompleted: async () => {
