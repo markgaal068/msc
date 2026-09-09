@@ -18,6 +18,56 @@ const TASK_TYPE_LABELS: Record<string, string> = {
   truefalse: "Igaz/Hamis állítások (CSAK az állítás szövege, NE kérj indoklást a hallgatótól)",
 };
 
+// Relatív "nehézségi" súlyok feladattípusonként — ez alapján osztjuk el arányosan
+// az összpontszámot, hogy az esszé/rövid kifejtős kérdések többet érjenek, mint
+// az igaz/hamis állítások.
+const TYPE_SCORE_WEIGHTS: Record<string, number> = {
+  truefalse: 1,
+  multiple: 2,
+  short: 3,
+  essay: 5,
+};
+
+// Kiszámolja PONTOSAN maxScore összegre a pontszámokat kérdésenként, feladattípusonként,
+// a legnagyobb maradék módszerével (largest remainder). Az LLM-re csak a kiszámolt
+// értékek átmásolása marad — a puszta "oszd el arányosan" utasítás GPT-4o-val
+// megbízhatatlanul összegződik és túllépi az összpontszámot.
+function computeScoreDistribution(
+  taskTypes: string[],
+  questionCounts: Record<string, number>,
+  maxScore: number
+): Record<string, number[]> {
+  const slots = taskTypes.flatMap(type => {
+    const count = questionCounts?.[type] ?? 5;
+    const weight = TYPE_SCORE_WEIGHTS[type] ?? 2;
+    return Array.from({ length: count }, () => ({ type, weight }));
+  });
+  const n = slots.length;
+  if (n === 0) return {};
+
+  // Minden kérdés legalább 1 pontot kap, a maradékot súlyozottan osztjuk szét.
+  const points = new Array(n).fill(1);
+  const remaining = maxScore - n;
+  if (remaining > 0) {
+    const totalWeight = slots.reduce((s, sl) => s + sl.weight, 0);
+    const raw = slots.map(sl => (remaining * sl.weight) / totalWeight);
+    const floors = raw.map(Math.floor);
+    floors.forEach((f, i) => { points[i] += f; });
+    const allocated = floors.reduce((a, b) => a + b, 0);
+    const leftover = remaining - allocated;
+    const order = raw
+      .map((v, i) => ({ i, frac: v - floors[i] }))
+      .sort((a, b) => b.frac - a.frac);
+    for (let k = 0; k < leftover; k++) points[order[k % n].i] += 1;
+  }
+
+  const byType: Record<string, number[]> = {};
+  slots.forEach((sl, i) => {
+    (byType[sl.type] ??= []).push(points[i]);
+  });
+  return byType;
+}
+
 export async function POST(req: Request) {
   // A PDF-ek a kliensről közvetlenül a Vercel Blob-ba kerülnek feltöltésre,
   // ide csak a blob URL-ek érkeznek — így elkerüljük a Serverless Function
@@ -65,6 +115,38 @@ export async function POST(req: Request) {
       })
       .filter(Boolean)
       .join("\n");
+
+    const totalQuestions = (taskTypes as string[]).reduce(
+      (sum: number, t: string) => sum + ((questionCounts as Record<string, number>)?.[t] ?? 5),
+      0
+    );
+
+    if (includeScoring && includeMaxScore) {
+      if (!Number.isFinite(maxScore) || maxScore < totalQuestions) {
+        return NextResponse.json(
+          { error: `Az összpontszám (${maxScore}) túl alacsony: legalább ${totalQuestions} pontot kell megadni, hogy minden kérdés legalább 1 pontot érjen.` },
+          { status: 400 }
+        );
+      }
+    }
+
+    let scoreInstructions = "";
+    if (includeScoring && includeMaxScore) {
+      const distribution = computeScoreDistribution(taskTypes, questionCounts, maxScore);
+      const breakdown = (taskTypes as string[])
+        .map((t: string) => {
+          const label = TASK_TYPE_LABELS[t];
+          const pts = distribution[t] || [];
+          const perQuestion = pts.map((p, i) => `${i + 1}. kérdés = ${p} pont`).join(", ");
+          const subtotal = pts.reduce((a, b) => a + b, 0);
+          return label ? `  - ${label}: ${perQuestion} (részösszeg: ${subtotal} pont)` : null;
+        })
+        .filter(Boolean)
+        .join("\n");
+      scoreInstructions = `- Az összes feladatra összesen PONTOSAN ${maxScore} pontot kell adni. A pontszám-kiosztás KÖTELEZŐEN, VÁLTOZTATÁS NÉLKÜL a következő (ne számolj újra, ne oszd el másképp — kérdéstípuson belül sorrendben másold át ezeket az értékeket a megfelelő kérdésekhez):\n${breakdown}\n  A teszt tetején tüntesd fel: "Összpontszám: ${maxScore} pont".`;
+    } else if (includeScoring) {
+      scoreInstructions = "- Adj pontozást minden feladathoz.";
+    }
 
     const giftInstructions = giftEligible ? `
 
@@ -121,11 +203,7 @@ FELADAT: Generálj egy tesztet a következő beállításokkal:
 - Nehézség: ${DIFFICULTY_LABELS[difficulty] || difficulty}
 - Feladattípusok és kérdésszámok:
 ${selectedTypes}
-${includeScoring && includeMaxScore
-  ? `- Az összes feladatra összesen pontosan ${maxScore} pontot ossz el arányosan a feladatok nehézsége és típusa szerint. A teszt tetején tüntesd fel: "Összpontszám: ${maxScore} pont".`
-  : includeScoring
-  ? "- Adj pontozást minden feladathoz."
-  : ""}
+${scoreInstructions}
 ${includeScoring ? `- PONTOZÁS ELHELYEZÉSE (KÖTELEZŐ): A pontszámot KÖZVETLENÜL a kérdés szövege után, a válaszlehetőségek ELŐTT tüntesd fel félkövéren, pl.: "1. Kérdés szövege? **(2 pont)**". NE az utolsó válaszlehetőség után szerepeljen!` : ""}
 
 Formázás: Markdown, feladattípusonként külön szekcióban (## fejléccel). A teszt tetején tüntesd fel a fájl nevét: "${testFileName}".${giftInstructions}`;
