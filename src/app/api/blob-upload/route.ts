@@ -5,9 +5,11 @@ import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 // Ez lehetővé teszi, hogy nagy PDF fájlok elkerüljék a Serverless Function
 // ~4.5MB-os request body limitjét (413 Payload Too Large éles környezetben).
 export async function POST(req: Request) {
-  const body = (await req.json()) as HandleUploadBody;
+  console.log("[blob-upload] hasToken:", !!process.env.BLOB_READ_WRITE_TOKEN);
 
   try {
+    const body = (await req.json()) as HandleUploadBody;
+
     const jsonResponse = await handleUpload({
       body,
       request: req,
@@ -26,6 +28,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(jsonResponse);
   } catch (error: any) {
+    console.error("[blob-upload] hiba:", error);
     return NextResponse.json(
       { error: error.message || "Hiba a fájl feltöltése során" },
       { status: 400 }
