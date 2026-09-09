@@ -351,7 +351,12 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
       // request body limitjébe (413 Payload Too Large).
       const uploaded = await Promise.all(
         testPdfs.map(async f => {
-          const blob = await uploadPresigned(f.name, f, {
+          // Az ékezetes (nem-ASCII) fájlnevek a Vercel Blob aláírt token
+          // ellenőrzésénél kódolási hibát (UTF-8/Latin-1 eltérés) okoznak,
+          // ezért a tárolási útvonalhoz egy biztonságos, ASCII azonosítót
+          // használunk — az eredeti fájlnevet külön küldjük tovább.
+          const safeName = `${crypto.randomUUID()}.pdf`
+          const blob = await uploadPresigned(safeName, f, {
             access: "private",
             handleUploadUrl: "/api/blob-upload",
           })
