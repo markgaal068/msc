@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import pdfParse from "pdf-parse";
+import { del, get } from "@vercel/blob";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -18,26 +19,33 @@ const TASK_TYPE_LABELS: Record<string, string> = {
 };
 
 export async function POST(req: Request) {
+  // A PDF-ek a kliensről közvetlenül a Vercel Blob-ba kerülnek feltöltésre,
+  // ide csak a blob URL-ek érkeznek — így elkerüljük a Serverless Function
+  // ~4.5MB-os request body limitjét (413 Payload Too Large éles környezetben).
+  const uploadedBlobUrls: string[] = [];
   try {
-    const formData = await req.formData();
-    const files = formData.getAll("files") as File[];
-    const settingsRaw = formData.get("settings") as string;
+    const body = await req.json();
+    const files = (body.files as { url: string; name: string }[]) || [];
+    const settings = body.settings;
+    uploadedBlobUrls.push(...files.map(f => f.url));
 
     if (!files.length) {
       return NextResponse.json({ error: "Nincs PDF fájl feltöltve" }, { status: 400 });
     }
-    if (!settingsRaw) {
+    if (!settings) {
       return NextResponse.json({ error: "Hiányoznak a beállítások" }, { status: 400 });
     }
 
-    const settings = JSON.parse(settingsRaw);
     const { testFileName, difficulty, taskTypes, questionCounts, includeScoring, includeMaxScore, maxScore, includeAnswerKey, includeGift } = settings;
     const giftEligible = !!includeGift && (taskTypes as string[]).every((t: string) => t === "truefalse" || t === "multiple");
 
-    // Extract text from all PDFs
+    // Extract text from all PDFs (letöltve a privát Blob store-ból, a szerver
+    // BLOB_READ_WRITE_TOKEN-jével hitelesítve)
     const pdfTexts: string[] = [];
     for (const file of files) {
-      const buffer = Buffer.from(await file.arrayBuffer());
+      const result = await get(file.url, { access: "private" });
+      if (!result || result.statusCode !== 200) continue;
+      const buffer = Buffer.from(await new Response(result.stream).arrayBuffer());
       const parsed = await pdfParse(buffer);
       if (parsed.text.trim()) {
         pdfTexts.push(`=== ${file.name} ===\n${parsed.text.trim()}`);
@@ -183,5 +191,10 @@ Formázás: Markdown, ugyanolyan fejlécekkel és számozással mint a teszt. Mi
       { error: error.message || "Hiba a teszt generálása során" },
       { status: 500 }
     );
+  } finally {
+    // A feltöltött PDF-ek a feldolgozás után nincsenek tovább szükségesek a Blob store-ban.
+    if (uploadedBlobUrls.length) {
+      del(uploadedBlobUrls).catch(err => console.error("Blob törlési hiba:", err));
+    }
   }
 }

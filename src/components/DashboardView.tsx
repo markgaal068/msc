@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { upload } from "@vercel/blob/client"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
@@ -345,13 +346,30 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
     setLoading("test")
     setTestResult(null)
     try {
-      const formData = new FormData()
-      testPdfs.forEach(f => formData.append("files", f))
-      formData.append("settings", JSON.stringify({
-        ...testSettings,
-        includeGift: testSettings.includeGift && isGiftEligible,
-      }))
-      const res  = await fetch("/api/generate-test", { method: "POST", body: formData })
+      // A PDF-eket közvetlenül a böngészőből töltjük fel a Vercel Blob-ba,
+      // így a nagyobb fájlok sem futnak bele a szerver ~4.5MB-os
+      // request body limitjébe (413 Payload Too Large).
+      const uploaded = await Promise.all(
+        testPdfs.map(async f => {
+          const blob = await upload(f.name, f, {
+            access: "private",
+            handleUploadUrl: "/api/blob-upload",
+          })
+          return { url: blob.url, name: f.name }
+        })
+      )
+
+      const res = await fetch("/api/generate-test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          files: uploaded,
+          settings: {
+            ...testSettings,
+            includeGift: testSettings.includeGift && isGiftEligible,
+          },
+        }),
+      })
       const data = await res.json()
       if (!res.ok || data.error) throw new Error(data.error || "Ismeretlen hiba")
       setTestResult(data)
