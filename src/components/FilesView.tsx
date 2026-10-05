@@ -8,7 +8,7 @@ import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type FileType = "faq" | "reflexio" | "hangjegyzet" | "teszt" | "megoldokulcs" | "moodle"
+type FileType = "faq" | "reflexio" | "hangjegyzet" | "teszt" | "megoldokulcs" | "moodle" | "programozas"
 type SortType = "date-desc" | "date-asc" | "name-asc" | "name-desc"
 
 interface SavedFile {
@@ -34,6 +34,7 @@ const TYPE_META: Record<FileType, { label: string; bg: string; text: string }> =
   teszt:        { label: "Teszt",        bg: "bg-[#004685]/10", text: "text-[#004685]" },
   megoldokulcs: { label: "Megoldókulcs", bg: "bg-[#97c93e]/15", text: "text-[#4a7a1e]" },
   moodle:       { label: "Moodle GIFT",  bg: "bg-[#004685]/10", text: "text-[#004685]" },
+  programozas:  { label: "Programozás",  bg: "bg-[#97c93e]/15", text: "text-[#4a7a1e]" },
 }
 
 const FILTERS = [
@@ -44,6 +45,7 @@ const FILTERS = [
   { id: "teszt",       label: "Teszt" },
   { id: "megoldokulcs",label: "Megoldókulcs" },
   { id: "moodle",      label: "Moodle GIFT" },
+  { id: "programozas", label: "Programozás" },
 ] as const
 
 const SORTS: { id: SortType; label: string }[] = [
@@ -75,6 +77,16 @@ function downloadAsText(content: string, filename: string) {
   const a = document.createElement("a")
   a.href = url
   a.download = `${filename}.txt`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function downloadAsXml(content: string, filename: string) {
+  const blob = new Blob([content], { type: "application/xml;charset=utf-8" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `${filename}.xml`
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -332,7 +344,15 @@ export default function FilesView({ user }: FilesViewProps) {
                     </p>
 
                     <div className="flex justify-end gap-2">
-                      {file.type === "moodle" ? (
+                      {file.type === "programozas" ? (
+                        <Button
+                          variant="outline"
+                          className="h-7 text-[9px] uppercase rounded-none gap-1.5 border-slate-200 hover:border-[#004685] hover:text-[#004685]"
+                          onClick={() => { downloadAsXml(file.content, file.name); toast.info("Letöltés megkezdve!", { style: { borderRadius: 0 } }) }}
+                        >
+                          <Download className="w-3 h-3" /> .xml
+                        </Button>
+                      ) : file.type === "moodle" ? (
                         <Button
                           variant="outline"
                           className="h-7 text-[9px] uppercase rounded-none gap-1.5 border-slate-200 hover:border-[#004685] hover:text-[#004685]"

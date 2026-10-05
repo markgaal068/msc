@@ -87,6 +87,7 @@ export async function POST(req: Request) {
     }
 
     const { testFileName, difficulty, taskTypes, questionCounts, includeScoring, includeMaxScore, maxScore, includeAnswerKey, includeGift } = settings;
+    const customInstructions: string = typeof settings.customInstructions === "string" ? settings.customInstructions.trim() : "";
     const giftEligible = !!includeGift && (taskTypes as string[]).every((t: string) => t === "truefalse" || t === "multiple");
 
     // Extract text from all PDFs (letöltve a privát Blob store-ból, a szerver
@@ -203,6 +204,7 @@ FELADAT: Generálj egy tesztet a következő beállításokkal:
 - Nehézség: ${DIFFICULTY_LABELS[difficulty] || difficulty}
 - Feladattípusok és kérdésszámok:
 ${selectedTypes}
+${customInstructions ? `- További felhasználói utasítások (kötelezően vedd figyelembe, ha nem ütköznek a fenti szabályokkal, pl. témakörök): ${customInstructions}` : ""}
 ${scoreInstructions}
 ${includeScoring ? `- PONTOZÁS ELHELYEZÉSE (KÖTELEZŐ): A pontszámot KÖZVETLENÜL a kérdés szövege után, a válaszlehetőségek ELŐTT tüntesd fel félkövéren, pl.: "1. Kérdés szövege? **(2 pont)**". NE az utolsó válaszlehetőség után szerepeljen!` : ""}
 

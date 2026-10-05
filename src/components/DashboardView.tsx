@@ -5,7 +5,7 @@ import { uploadPresigned } from "@vercel/blob/client"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2, Upload, User, FileText, X, Download, Save } from "lucide-react"
+import { Loader2, Upload, User, FileText, X, Download, Save, BookOpen, Code2, Layers, Sparkles } from "lucide-react"
 import { toast } from "react-toastify"
 import ReactMarkdown from 'react-markdown'
 import ProfileView from "@/components/ProfileView"
@@ -13,15 +13,26 @@ import FilesView from "@/components/FilesView"
 import ChatView from "@/components/ChatView"
 
 type Section = "main" | "profile" | "files" | "chat"
-type FileType = "faq" | "reflexio" | "hangjegyzet" | "teszt" | "megoldokulcs" | "moodle"
+type FileType = "faq" | "reflexio" | "hangjegyzet" | "teszt" | "megoldokulcs" | "moodle" | "programozas"
 
 interface DashboardViewProps {
   onLogout: () => void
   user: { email: string; name: string }
 }
 
+type TestMode = "theory" | "practical" | "programming"
+type ProgLanguage = "python" | "cpp"
+type ProgDifficulty = "easy" | "medium" | "hard"
+
+interface ProgResult {
+  xml: string
+  fileName: string
+  questions: { title: string; topic: string; plainText: string; solution: string; testCount: number }[]
+}
+
 interface TestSettings {
   testFileName: string
+  customInstructions: string
   difficulty: "easy" | "medium" | "hard"
   taskTypes: string[]
   questionCounts: Record<string, number>
@@ -45,6 +56,18 @@ const TASK_TYPES = [
   { id: "short",     label: "Rövid kifejtős" },
   { id: "multiple",  label: "Többválasztós" },
   { id: "truefalse", label: "Igaz / Hamis" },
+]
+
+const MODE_OPTIONS: { id: TestMode; label: string; hint: string; icon: typeof BookOpen }[] = [
+  { id: "theory", label: "Elméleti teszt", hint: "Kérdések generálása feltöltött PDF-ekből", icon: BookOpen },
+  { id: "practical", label: "Gyakorlati feladatok", hint: "Fejlesztés alatt", icon: Layers },
+  { id: "programming", label: "Programozási feladat", hint: "5 komplex, futtatással ellenőrzött feladat Moodle XML-ben", icon: Code2 },
+]
+
+const DIFFICULTY_OPTIONS: { id: ProgDifficulty; label: string; hint: string }[] = [
+  { id: "easy", label: "Könnyű", hint: "Rövid programok, alapvető elágazások és ciklusok" },
+  { id: "medium", label: "Közepes", hint: "Többlépéses feldolgozás, listák, szótárak" },
+  { id: "hard", label: "Nehéz", hint: "Képletek, szimulációk, összetett algoritmusok (egyetemi szint)" },
 ]
 
 const DEFAULT_COUNTS: Record<string, number> = {
@@ -209,6 +232,16 @@ function downloadAsText(content: string, filename: string) {
   URL.revokeObjectURL(url)
 }
 
+function downloadAsXml(content: string, filename: string) {
+  const blob = new Blob([content], { type: "application/xml;charset=utf-8" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `${filename}.xml`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function DashboardView({ onLogout, user }: DashboardViewProps) {
@@ -223,6 +256,7 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
   const [showTestModal, setShowTestModal] = useState(false)
   const [testSettings, setTestSettings]   = useState<TestSettings>({
     testFileName:      "teszt",
+    customInstructions: "",
     difficulty:        "medium",
     taskTypes:         ["multiple", "truefalse"],
     questionCounts:    { ...DEFAULT_COUNTS },
@@ -235,6 +269,14 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
     giftFileName:      "moodle_gift",
   })
   const [testResult, setTestResult] = useState<{ test: string; answerKey?: string; gift?: string } | null>(null)
+
+  // Teszt generátor: mód-választó + programozási feladat állapot
+  const [testMode, setTestMode]           = useState<TestMode>("theory")
+  const [progLanguage, setProgLanguage]   = useState<ProgLanguage>("python")
+  const [progDifficulty, setProgDifficulty] = useState<ProgDifficulty>("easy")
+  const [progInstructions, setProgInstructions] = useState("")
+  const [progContext, setProgContext]     = useState("")
+  const [progResult, setProgResult]       = useState<ProgResult | null>(null)
 
   // Save state
   const [saveModal, setSaveModal]   = useState<SaveModal | null>(null)
@@ -336,6 +378,30 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
       ...prev,
       questionCounts: { ...prev.questionCounts, [id]: Math.max(1, Math.min(50, value || 1)) },
     }))
+
+  const handleGenerateProgramming = async () => {
+    setLoading("programming")
+    setProgResult(null)
+    try {
+      const res = await fetch("/api/programming-task", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          language: progLanguage,
+          difficulty: progDifficulty,
+          instructions: progInstructions,
+          context: progContext,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) throw new Error(data.error || "Ismeretlen hiba")
+      setProgResult(data)
+    } catch (error: any) {
+      toast.error(`Hiba: ${error.message}`)
+    } finally {
+      setLoading(null)
+    }
+  }
 
   const isGiftEligible = testSettings.taskTypes.length > 0 &&
     testSettings.taskTypes.every(t => t === "truefalse" || t === "multiple")
@@ -480,6 +546,18 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
                   value={testSettings.testFileName}
                   onChange={e => setTestSettings(prev => ({ ...prev, testFileName: e.target.value }))}
                   className="w-full border border-slate-200 px-3 py-2 text-sm font-light focus:outline-none focus:border-[#004685] rounded-none"
+                />
+              </div>
+
+              {/* Custom instructions */}
+              <div>
+                <label className="text-[9px] font-bold uppercase tracking-[0.25em] text-slate-400 block mb-2">Egyedi utasítások (témakörök stb.)</label>
+                <textarea
+                  rows={3}
+                  placeholder="pl. csak a 3. és 4. fejezetből kérdezz; a lineáris regresszióra legyen több kérdés"
+                  value={testSettings.customInstructions}
+                  onChange={e => setTestSettings(prev => ({ ...prev, customInstructions: e.target.value }))}
+                  className="w-full border border-slate-200 px-3 py-2 text-sm font-light focus:outline-none focus:border-[#004685] rounded-none resize-y"
                 />
               </div>
 
@@ -864,8 +942,184 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
             </TabsContent>
 
             {/* ── Teszt Generátor ── */}
-            <TabsContent value="test" className="h-full m-0 outline-none flex flex-col">
-              {testResult ? (
+            <TabsContent value="test" className="h-full min-h-0 m-0 outline-none flex flex-col overflow-y-auto pr-1">
+              <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 flex-1 min-h-0">
+              {/* Generálás típusa — egymás alatt, animált kártyák */}
+              <div className="shrink-0 space-y-3 lg:w-72 lg:sticky lg:top-0 self-start">
+                <label className="text-[9px] font-bold uppercase tracking-[0.25em] text-slate-400 block">Generálás típusa</label>
+                {MODE_OPTIONS.map((opt, i) => {
+                  const active = testMode === opt.id
+                  const Icon = opt.icon
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setTestMode(opt.id)}
+                      style={{ animationDelay: `${i * 70}ms` }}
+                      className={`animate-in fade-in slide-in-from-left-4 duration-500 fill-mode-both group w-full text-left flex items-center gap-4 border px-5 py-4 transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md ${
+                        active
+                          ? "border-[#004685] bg-[#004685] text-white shadow-lg"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-[#004685]/50"
+                      }`}
+                    >
+                      <span className={`w-10 h-10 shrink-0 flex items-center justify-center transition-all duration-300 ${active ? "bg-white/15 rotate-6 scale-110" : "bg-slate-50 group-hover:bg-[#004685]/10"}`}>
+                        <Icon className="w-5 h-5" />
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-[11px] font-bold uppercase tracking-[0.2em]">{opt.label}</span>
+                        <span className={`block text-[10px] mt-0.5 transition-colors duration-300 ${active ? "text-white/70" : "text-slate-400"}`}>{opt.hint}</span>
+                      </span>
+                      <span className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${active ? "bg-[#97c93e] scale-100" : "bg-slate-200 scale-75"}`} />
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="flex-1 min-w-0 flex flex-col min-h-0">
+
+              {testMode === "practical" && (
+                <div className="animate-in fade-in zoom-in-95 duration-500 flex-1 flex flex-col items-center justify-center gap-3 border-2 border-dashed border-slate-200 bg-white p-8" style={{ minHeight: "200px" }}>
+                  <Layers className="w-8 h-8 text-slate-300 animate-pulse" />
+                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-400">Gyakorlati feladatok generálása</p>
+                  <p className="text-[10px] italic text-slate-300">fejlesztés alatt</p>
+                </div>
+              )}
+
+              {testMode === "programming" && (progResult ? (
+                <div className="animate-in fade-in slide-in-from-bottom-3 duration-500 flex-1 flex flex-col min-h-0">
+                  <div className="flex justify-between items-center mb-4 shrink-0 flex-wrap gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      {progResult.questions.length} programozási feladat · futtatással ellenőrizve
+                    </span>
+                    <div className="flex gap-2 flex-wrap">
+                      <Button
+                        variant="ghost"
+                        className="h-7 text-[9px] uppercase font-bold text-[#97c93e] gap-1"
+                        onClick={() => openSaveModal("programozas", progResult.xml, progResult.fileName)}
+                      >
+                        <Save className="w-3 h-3" /> Mentés
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="h-7 text-[9px] uppercase rounded-none gap-1.5 border-[#004685] text-[#004685] hover:bg-[#004685]/5"
+                        onClick={() => downloadAsXml(progResult.xml, progResult.fileName)}
+                      >
+                        <Download className="w-3 h-3" /> Moodle XML (.xml)
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="h-7 text-[9px] uppercase font-bold text-[#004685]"
+                        onClick={() => setProgResult(null)}
+                      >
+                        Új generálás
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex-1 bg-white p-4 sm:p-8 overflow-y-auto border-2 border-slate-100 shadow-inner space-y-4">
+                    {progResult.questions.map((q, i) => (
+                      <div
+                        key={i}
+                        style={{ animationDelay: `${i * 90}ms` }}
+                        className="animate-in fade-in slide-in-from-bottom-2 duration-500 fill-mode-both border border-slate-100 hover:border-[#004685]/40 hover:shadow-md transition-all p-5"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="w-7 h-7 flex items-center justify-center bg-[#004685] text-white text-[11px] font-black">{i + 1}</span>
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">{q.topic} · {q.testCount} teszteset</span>
+                        </div>
+                        <h3 className="text-sm font-bold text-[#004685] mt-3">{q.title}</h3>
+                        <p className="text-sm mt-2 leading-relaxed text-slate-700">{q.plainText}</p>
+                        <details className="mt-3 group">
+                          <summary className="text-[10px] font-bold uppercase tracking-wider text-[#97c93e] cursor-pointer select-none">Megoldókód megnyitása</summary>
+                          <pre className="mt-2 bg-slate-50 p-3 text-xs overflow-x-auto"><code>{q.solution}</code></pre>
+                        </details>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="animate-in fade-in duration-500 space-y-6">
+                  <div>
+                    <label className="text-[9px] font-bold uppercase tracking-[0.25em] text-slate-400 block mb-2">Programozási nyelv</label>
+                    <select
+                      value={progLanguage}
+                      onChange={e => setProgLanguage(e.target.value as ProgLanguage)}
+                      className="w-full sm:w-64 border border-slate-200 bg-white px-3 py-2.5 text-sm font-light focus:outline-none focus:border-[#004685] rounded-none transition-colors"
+                    >
+                      <option value="python">Python</option>
+                      <option value="cpp">C++</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-bold uppercase tracking-[0.25em] text-slate-400 block mb-2">Nehézségi szint</label>
+                    <div className="space-y-2">
+                      {DIFFICULTY_OPTIONS.map((opt, i) => {
+                        const active = progDifficulty === opt.id
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => setProgDifficulty(opt.id)}
+                            style={{ animationDelay: `${i * 60}ms` }}
+                            className={`animate-in fade-in slide-in-from-right-4 duration-500 fill-mode-both w-full text-left flex items-center gap-4 border px-4 py-3 transition-all duration-300 hover:-translate-y-0.5 ${
+                              active ? "border-[#97c93e] bg-[#97c93e]/10" : "border-slate-200 bg-white hover:border-[#97c93e]/60"
+                            }`}
+                          >
+                            <span className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${active ? "bg-[#97c93e] scale-100" : "bg-slate-200 scale-75"}`} />
+                            <span className="flex-1">
+                              <span className="block text-[11px] font-bold uppercase tracking-[0.18em] text-[#004685]">{opt.label}</span>
+                              <span className="block text-[10px] text-slate-400 mt-0.5">{opt.hint}</span>
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-bold uppercase tracking-[0.25em] text-slate-400 block mb-2">Kontextus (miben játszódjanak a feladatok)</label>
+                    <input
+                      type="text"
+                      maxLength={300}
+                      placeholder="pl. egy vasúti forgalomirányító központ, egy szélerőmű-park, egy bioinformatikai laboratórium"
+                      value={progContext}
+                      onChange={e => setProgContext(e.target.value)}
+                      className="w-full border border-slate-200 px-3 py-2.5 text-sm font-light focus:outline-none focus:border-[#004685] rounded-none transition-colors"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1.5">Ha üres, a rendszer változatos szövegkörnyezeteket választ. Ha megadod, minden feladat ebben játszódik.</p>
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-bold uppercase tracking-[0.25em] text-slate-400 block mb-2">Témakörök és egyéb utasítások</label>
+                    <textarea
+                      rows={4}
+                      placeholder="pl. szimulációk és numerikus módszerek; a feladatok szövege legyen tömör"
+                      value={progInstructions}
+                      onChange={e => setProgInstructions(e.target.value)}
+                      className="w-full border border-slate-200 px-3 py-2.5 text-sm font-light focus:outline-none focus:border-[#004685] rounded-none resize-y transition-colors"
+                    />
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={handleGenerateProgramming}
+                      disabled={loading === "programming"}
+                      className="group bg-[#004685] hover:bg-[#97c93e] text-white rounded-none px-8 sm:px-12 py-5 sm:py-7 font-bold uppercase tracking-widest text-[10px] shadow-lg transition-all duration-300 hover:-translate-y-0.5"
+                    >
+                      {loading === "programming" ? (
+                        <><Loader2 className="animate-spin mr-2 w-4 h-4" /> Generálás és futtatásos ellenőrzés...</>
+                      ) : (
+                        <><Sparkles className="w-4 h-4 mr-2 transition-transform duration-300 group-hover:rotate-12" /> Feladatsor generálása</>
+                      )}
+                    </Button>
+                  </div>
+                  {loading === "programming" && (
+                    <p className="text-[10px] italic text-slate-400 text-right animate-pulse">A megoldások futtatása több percet is igénybe vehet.</p>
+                  )}
+                </div>
+              ))}
+
+              {testMode !== "theory" ? null : testResult ? (
                 <div className="flex-1 flex flex-col min-h-0">
                   <div className="flex justify-between items-center mb-4 shrink-0 flex-wrap gap-2">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Generált teszt</span>
@@ -984,6 +1238,8 @@ export default function DashboardView({ onLogout, user }: DashboardViewProps) {
                   </div>
                 </div>
               )}
+              </div>
+              </div>
             </TabsContent>
 
           </div>
